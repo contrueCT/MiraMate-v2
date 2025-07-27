@@ -1,0 +1,19 @@
+[
+    {
+        "model": "gpt-4o",
+        "api_key": "YOUR_OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1",
+        "api_type": "openai",
+        "model_kwargs": {
+            "temperature": 0.8
+        }
+    },
+    {
+        "model": "gemini-1.5-flash-latest",
+        "api_key": "YOUR_GEMINI_API_KEY",
+        "api_type": "gemini",
+        "model_kwargs": {
+            "temperature": 0.0
+        }
+    }
+]

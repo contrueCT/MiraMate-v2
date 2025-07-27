@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "MiraMate"
+version = "2.0.0"
+description = "基于Langchain和ChromaDB的情感陪伴智能体"
+readme = "README.md"
+requires-python = "==3.13.3"
+authors = [
+    {name = "contrueCT"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+# --- 核心依赖 ---
+dependencies = [
+    # LangChain 核心 & 社区 & OpenAI & Google
+    "langchain>=0.2.0",
+    "langchain-community>=0.2.0",
+    "langchain-openai>=0.1.7",
+    "langchain-google-genai>=1.0.4",
+
+    # 原有依赖
+    "chromadb>=0.5.0", # 建议升级到 0.5.x
+    "sentence-transformers>=2.7.0", # 嵌入模型
+    "pyfiglet>=1.0.2", # 用于漂亮的启动打印
+    "python-dotenv>=1.0.1", # 管理 .env 文件
+
+    # 新增依赖
+    "fastapi>=0.111.0",        
+    "uvicorn[standard]>=0.29.0", # API服务的运行器
+    "jinja2>=3.1.4",           # 用于Prompt模板
+    "tiktoken>=0.7.0",         # OpenAI的tokenizer，用于精确计算token
+    "aiohttp>=3.9.5",          # LangChain 异步调用需要的库
+    "APScheduler>=3.10.4",     # 用于后台定时任务 (比 schedule 更强大，支持异步)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff", # 新增：一个超快的linter和formatter，可以替代black和isort
+]
+
+# --- 项目URL ---
+[project.urls]
+Homepage = "https://github.com/contrueCT/MiraMate"
+Repository = "https://github.com/contrueCT/MiraMate"
+
+# --- 工具配置 ---
+[tool.hatch.version]
+path = "MiraMate/__about__.py"
+
+
+[tool.ruff]
+# 与 black 兼容
+line-length = 88
+# 启用 isort 规则，并指定已知的第三方库
+[tool.ruff.lint.isort]
+known-third-party = ["langchain", "fastapi", "chromadb", "openai"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+
+[tool.hatch.build]
+
+include = [
+    "/src/MiraMate",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/MiraMate"]
