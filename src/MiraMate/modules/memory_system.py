@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 # 在导入任何模型前设置环境变量
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_DATASETS_OFFLINE"] = "1"
@@ -70,17 +71,6 @@ class MemorySystem:
         """初始化记忆系统"""
         if persist_directory is None:
             persist_directory = CHROMA_DB_DIR
-            
-        # 处理相对路径，支持容器环境
-        if not os.path.isabs(persist_directory):
-            if os.getenv('DOCKER_ENV'):
-                # Docker环境中使用绝对路径
-                persist_directory = f"/app/{persist_directory}"
-            else:
-                # 本地环境中转换为绝对路径
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                project_root = os.path.dirname(current_dir)  # 假设此文件在项目根目录
-                persist_directory = os.path.join(project_root, persist_directory)
         
         # 创建持久化目录
         os.makedirs(persist_directory, exist_ok=True)
@@ -150,56 +140,42 @@ class MemorySystem:
         self.save_user_profile(profile)
 
     # === 💬 对话记录记忆 ===
-    # 保存所有的对话记忆
     def save_dialog_log(self, user_input: str, ai_response: str, topic: str, 
                        sentiment: str, importance: float, tags: List[str], 
                        additional_metadata: Optional[Dict] = None):
         """保存对话记录到ChromaDB"""
-        
-        # 生成唯一ID
         dialog_id = f"dialog_{uuid4().hex}"
         timestamp = get_iso_timestamp()
         current_time = datetime.now()
         natural_time = format_natural_time(current_time)
+        tags_str = "、".join(tags) if tags else "无"
         
-        # 构建包含完整信息的文档内容
-        tags_str = "、".join(tags) if tags else "无标签"
+        # 将关键元数据信息转化为自然语言
+        document_header = f"[对话摘要] 这是一段记录于 {natural_time} 的对话。对话主题是“{topic}”，整体情感基调为“{sentiment}”，相关标签为“{tags_str}”。\n\n"
+        dialog_body = f"[对话内容]\n用户：{user_input}\nAI：{ai_response}"
+        dialog_content = document_header + dialog_body
         
-        dialog_content = f"""时间：{natural_time}
-话题：{topic}
-情感：{sentiment}
-标签：{tags_str}
-用户：{user_input}
-AI：{ai_response}"""
-        
-        # 准备元数据（只保留必要的结构化数据）
+        #  metadata 只保留用于精确过滤的结构化数据
         metadata = {
             "type": "dialog_log",
             "timestamp": timestamp,
             "topic": topic,
             "sentiment": sentiment,
             "importance": importance,
-            "tags": json.dumps(tags, ensure_ascii=False),
-            "user_input_length": len(user_input),
-            "ai_response_length": len(ai_response)
+            "tags": json.dumps(tags, ensure_ascii=False) # tags 也保留，方便用 where={"tags": {"$contains": "某个标签"}} 过滤
         }
         
-        # 添加额外元数据
         if additional_metadata:
             metadata.update(additional_metadata)
         
-        # 保存到ChromaDB
         try:
             self.collections["dialog_logs"].add(
                 ids=[dialog_id],
                 metadatas=[metadata],
-                documents=[dialog_content]
+                documents=[dialog_content] # 使用新的、内容更丰富的 document
             )
             print(f"✅ 对话记录已保存: {topic} (重要性: {importance})")
-            
-            # 更新活跃标签
             self.update_active_tags(tags)
-            
             return dialog_id
         except Exception as e:
             print(f"❌ 保存对话记录失败: {e}")
@@ -207,7 +183,7 @@ AI：{ai_response}"""
 
     def search_dialog_logs(self, query: str, n_results: int = 5, 
                           where_filter: Optional[Dict] = None, 
-                          similarity_threshold: float = 0.6) -> List[Dict]:
+                          threshold: float = 0.5) -> List[Dict]:
         """搜索对话记录"""
         try:
             search_params = {
@@ -233,7 +209,7 @@ AI：{ai_response}"""
                 for i, doc_content in enumerate(docs_list):
                     if i < len(distances_list):
                         distance = distances_list[i]
-                        if distance <= (1 - similarity_threshold):  # 转换为相似度阈值
+                        if distance <= threshold:  # 只保留相似度高于阈值的结果
                             metadata = metadatas_list[i]
                             # 解析标签
                             tags = json.loads(metadata.get("tags", "[]"))
@@ -285,53 +261,40 @@ AI：{ai_response}"""
             print(f"❌ 获取最近对话失败: {e}")
             return []
 
-    # === 🧠 概念知识（事实记忆）===
+    # === 概念知识（事实记忆）===
     # 先存到缓冲文件（持久化），然后在空闲时经过模型处理后保存到ChromaDB
     def save_fact_memory(self, content: str, tags: List[str], 
                         source: str = "dialog", confidence: float = 1.0,
                         additional_metadata: Optional[Dict] = None):
         """保存事实记忆到ChromaDB"""
-        
-        # 生成唯一ID
         fact_id = f"fact_{uuid4().hex}"
         timestamp = get_iso_timestamp()
-        current_time = datetime.now()
-        natural_time = format_natural_time(current_time)
+        natural_time = format_natural_time(datetime.now())
+        tags_str = "、".join(tags) if tags else "无"
+
+        # [核心修改] 将标签、来源等信息融入文档
+        fact_content = f"[事实记忆] 这是一条记录于 {natural_time} 的事实，来源是“{source}”，相关标签为“{tags_str}”。事实内容：{content}"
         
-        # 构建包含完整信息的文档内容
-        tags_str = "、".join(tags) if tags else "无标签"
-        
-        fact_content = f"""时间：{natural_time}
-来源：{source}
-标签：{tags_str}
-内容：{content}"""
-        
-        # 准备元数据
+        # [核心修改] metadata 只保留用于过滤的字段
         metadata = {
             "type": "fact",
             "timestamp": timestamp,
             "source": source,
             "confidence": confidence,
-            "tags": json.dumps(tags, ensure_ascii=False),
-            "content_length": len(content)
+            "tags": json.dumps(tags, ensure_ascii=False)
         }
         
-        # 添加额外元数据
         if additional_metadata:
             metadata.update(additional_metadata)
         
-        # 保存到ChromaDB
         try:
             self.collections["facts"].add(
                 ids=[fact_id],
                 metadatas=[metadata],
-                documents=[fact_content]
+                documents=[fact_content] # 使用新的 document
             )
             print(f"✅ 事实记忆已保存: {content[:30]}... (置信度: {confidence})")
-            
-            # 更新活跃标签
             self.update_active_tags(tags)
-            
             return fact_id
         except Exception as e:
             print(f"❌ 保存事实记忆失败: {e}")
@@ -339,7 +302,7 @@ AI：{ai_response}"""
 
     def search_fact_memory(self, query: str, n_results: int = 3,
                           where_filter: Optional[Dict] = None,
-                          similarity_threshold: float = 0.7) -> List[Dict]:
+                          threshold: float = 0.5) -> List[Dict]:
         """搜索事实记忆"""
         try:
             search_params = {
@@ -365,7 +328,7 @@ AI：{ai_response}"""
                 for i, doc_content in enumerate(docs_list):
                     if i < len(distances_list):
                         distance = distances_list[i]
-                        if distance <= (1 - similarity_threshold):
+                        if distance <= threshold:
                             metadata = metadatas_list[i]
                             tags = json.loads(metadata.get("tags", "[]"))
                             
@@ -407,11 +370,10 @@ AI：{ai_response}"""
             print(f"❌ 更新事实记忆置信度失败: {e}")
         return False
 
-    # === 📝 缓存管理方法 ===
+    # === 缓存管理方法 ===
     
     def cache_user_preference(self, content: str, preference_type: str, 
-                             tags: List[str], confidence: float = 1.0,
-                             additional_metadata: Optional[Dict] = None):
+                             tags: List[str], confidence: float = 1.0):
         """缓存用户偏好信息到本地JSON文件"""
         
         # 创建缓存条目
@@ -422,9 +384,7 @@ AI：{ai_response}"""
             "tags": tags,
             "confidence": confidence,
             "timestamp": get_iso_timestamp(),
-            "natural_time": format_natural_time(datetime.now()),
-            "content_length": len(content),
-            "additional_metadata": additional_metadata or {}
+            "natural_time": format_natural_time(datetime.now())
         }
         
         # 读取现有缓存
@@ -440,11 +400,8 @@ AI：{ai_response}"""
         return cache_entry["id"]
     
     def cache_fact_memory(self, content: str, tags: List[str], 
-                         source: str = "dialog", confidence: float = 1.0,
-                         additional_metadata: Optional[Dict] = None):
+                         source: str = "dialog", confidence: float = 1.0):
         """缓存事实记忆到本地JSON文件"""
-        
-        # 创建缓存条目
         cache_entry = {
             "id": f"fact_cache_{uuid4().hex}",
             "content": content,
@@ -453,17 +410,12 @@ AI：{ai_response}"""
             "confidence": confidence,
             "timestamp": get_iso_timestamp(),
             "natural_time": format_natural_time(datetime.now()),
-            "content_length": len(content),
-            "additional_metadata": additional_metadata or {}
+            "content_length": len(content)
+            # "additional_metadata" 相关的键和逻辑被移除
         }
         
-        # 读取现有缓存
         facts_cache = self._load_cache_file(FACT_CACHE_PATH)
-        
-        # 添加新条目
         facts_cache.append(cache_entry)
-        
-        # 保存缓存
         self._save_cache_file(FACT_CACHE_PATH, facts_cache)
         
         print(f"✅ 事实记忆已缓存: {content[:30]}... (置信度: {confidence})")
@@ -560,50 +512,38 @@ AI：{ai_response}"""
         self.clear_profile_cache()
         print("🗑️ 所有缓存已清空")
 
-    # === 🎯 用户偏好信息 ===
+    # === 用户偏好信息 ===
     # 先存到缓冲文件（持久化），然后在空闲时经过模型处理后保存到ChromaDB
     def save_user_preference(self, content: str, preference_type: str, 
                             tags: List[str], additional_metadata: Optional[Dict] = None):
         """保存用户偏好信息到ChromaDB"""
-        
-        # 生成唯一ID
         preference_id = f"preference_{uuid4().hex}"
         timestamp = get_iso_timestamp()
-        current_time = datetime.now()
-        natural_time = format_natural_time(current_time)
+        natural_time = format_natural_time(datetime.now())
+        tags_str = "、".join(tags) if tags else "无"
+
+        # [核心修改] 将类型、标签等信息融入文档
+        preference_content = f"[用户偏好] 这是一条记录于 {natural_time} 的关于用户的偏好信息，类型为“{preference_type}”，相关标签为“{tags_str}”。偏好内容：{content}"
         
-        # 构建包含完整信息的文档内容
-        tags_str = "、".join(tags) if tags else "无标签"
-        
-        preference_content = f"""时间：{natural_time}
-类型：{preference_type}
-标签：{tags_str}
-内容：{content}"""
-        
-        # 准备元数据
+        # [核心修改] metadata 只保留用于过滤的字段
         metadata = {
-            "type": preference_type,
+            "type": "preference", # 统一使用'preference'作为大类
+            "preference_type": preference_type, # 保留具体的子类型用于过滤
             "tags": json.dumps(tags, ensure_ascii=False),
-            "timestamp": timestamp,
-            "content_length": len(content)
+            "timestamp": timestamp
         }
         
-        # 添加额外元数据
         if additional_metadata:
             metadata.update(additional_metadata)
         
-        # 保存到ChromaDB
         try:
             self.collections["user_preferences"].add(
                 ids=[preference_id],
                 metadatas=[metadata],
-                documents=[preference_content]
+                documents=[preference_content] # 使用新的 document
             )
             print(f"✅ 用户偏好已保存: {preference_type} - {content[:30]}...")
-            
-            # 更新活跃标签
             self.update_active_tags(tags)
-            
             return preference_id
         except Exception as e:
             print(f"❌ 保存用户偏好失败: {e}")
@@ -611,7 +551,7 @@ AI：{ai_response}"""
 
     def search_user_preferences(self, query: str, n_results: int = 5,
                                where_filter: Optional[Dict] = None,
-                               similarity_threshold: float = 0.7) -> List[Dict]:
+                               threshold: float = 0.5) -> List[Dict]:
         """搜索用户偏好信息"""
         try:
             search_params = {
@@ -637,7 +577,7 @@ AI：{ai_response}"""
                 for i, doc_content in enumerate(docs_list):
                     if i < len(distances_list):
                         distance = distances_list[i]
-                        if distance <= (1 - similarity_threshold):
+                        if distance <= threshold:
                             metadata = metadatas_list[i]
                             tags = json.loads(metadata.get("tags", "[]"))
                             
@@ -665,51 +605,38 @@ AI：{ai_response}"""
             where_filter={"type": preference_type}
         )
 
-    # === 🎯 重大事件管理 ===
+    # === 重大事件管理 ===
     def save_important_event(self, content: str, event_type: str, summary: str,
                             tags: List[str], additional_metadata: Optional[Dict] = None):
         """保存重大事件到ChromaDB"""
-        
-        # 生成唯一ID
         event_id = f"event_{uuid4().hex}"
         timestamp = get_iso_timestamp()
-        current_time = datetime.now()
-        natural_time = format_natural_time(current_time)
+        natural_time = format_natural_time(datetime.now())
+        tags_str = "、".join(tags) if tags else "无"
+
+        # [核心修改] 将所有关键信息融入文档，特别是概要
+        event_content = f"[重大事件] 这是一条记录于 {natural_time} 的重大事件。事件类型为“{event_type}”，概要是“{summary}”，相关标签为“{tags_str}”。\n\n[详细内容]\n{content}"
         
-        # 构建包含完整信息的文档内容
-        tags_str = "、".join(tags) if tags else "无标签"
-        
-        event_content = f"""时间：{natural_time}
-事件类型：{event_type}
-概述：{summary}
-标签：{tags_str}
-详细内容：{content}"""
-        
-        # 准备元数据
+        # [核心修改] metadata 只保留用于过滤的字段
         metadata = {
+            "type": "important_event",
             "event_type": event_type,
-            "summary": summary,
+            "summary": summary, # 概要可以保留，方便预览
             "tags": json.dumps(tags, ensure_ascii=False),
-            "timestamp": timestamp,
-            "content_length": len(content)
+            "timestamp": timestamp
         }
         
-        # 添加额外元数据
         if additional_metadata:
             metadata.update(additional_metadata)
         
-        # 保存到ChromaDB
         try:
             self.collections["important_events"].add(
                 ids=[event_id],
                 metadatas=[metadata],
-                documents=[event_content]
+                documents=[event_content] # 使用新的 document
             )
             print(f"✅ 重大事件已保存: {event_type} - {summary}")
-            
-            # 更新活跃标签
             self.update_active_tags(tags)
-            
             return event_id
         except Exception as e:
             print(f"❌ 保存重大事件失败: {e}")
@@ -717,7 +644,7 @@ AI：{ai_response}"""
 
     def search_important_events(self, query: str, n_results: int = 5,
                                where_filter: Optional[Dict] = None,
-                               similarity_threshold: float = 0.7) -> List[Dict]:
+                               threshold: float = 0.5) -> List[Dict]:
         """搜索重大事件"""
         try:
             search_params = {
@@ -743,7 +670,7 @@ AI：{ai_response}"""
                 for i, doc_content in enumerate(docs_list):
                     if i < len(distances_list):
                         distance = distances_list[i]
-                        if distance <= (1 - similarity_threshold):
+                        if distance <= threshold:
                             metadata = metadatas_list[i]
                             tags = json.loads(metadata.get("tags", "[]"))
                             
@@ -1070,16 +997,18 @@ def get_memory_system():
 
 # 缓存相关便捷函数
 def cache_user_preference(content: str, preference_type: str, tags: List[str], 
-                         confidence: float = 1.0, additional_metadata: Optional[Dict] = None):
+                         confidence: float = 1.0):
     """便捷函数：缓存用户偏好信息"""
     memory_system = get_memory_system()
-    return memory_system.cache_user_preference(content, preference_type, tags, confidence, additional_metadata)
+    # 现在的调用是正确的，参数数量和类型都匹配
+    return memory_system.cache_user_preference(content, preference_type, tags, confidence)
 
 def cache_fact_memory(content: str, tags: List[str], source: str = "dialog", 
-                     confidence: float = 1.0, additional_metadata: Optional[Dict] = None):
+                     confidence: float = 1.0): # <-- 移除 additional_metadata
     """便捷函数：缓存事实记忆"""
     memory_system = get_memory_system()
-    return memory_system.cache_fact_memory(content, tags, source, confidence, additional_metadata)
+    # 现在的调用是正确的
+    return memory_system.cache_fact_memory(content, tags, source, confidence)
 
 def cache_profile_update(profile_data: Dict, source: str = "dialog"):
     """便捷函数：缓存用户画像更新"""
@@ -1225,23 +1154,27 @@ if __name__ == "__main__":
     
     # 测试事实记忆保存
     fact_id = memory_system.save_fact_memory(
-        "主人喜欢流萤和星星的意象，认为她很治愈。", 
-        memory_data["tags"]
+        content="主人喜欢流萤和星星的意象，认为她很治愈。", 
+        tags=["流萤", "星星", "治愈"],
+        confidence=0.9 # 确保传入了 confidence
+        # 不再传入 additional_metadata
     )
     
     # 测试用户偏好保存
     preference_id = memory_system.save_user_preference(
-        "用户喜欢轻松搞笑的动画番剧，最喜欢的是《孤独摇滚》。",
-        "娱乐",
-        ["番剧", "搞笑", "轻松"]
+        content="用户喜欢轻松搞笑的动画番剧，最喜欢的是《孤独摇滚》。",
+        preference_type="娱乐",
+        tags=["番剧", "搞笑", "轻松"]
+        # 不再传入 additional_metadata
     )
     
     # 测试重大事件保存
     event_id = memory_system.save_important_event(
-        "用户希望考上理想的研究生院校，目前正在准备复习，每天都有学习计划。",
-        "考试",
-        "用户计划考研",
-        ["目标", "长期", "紧张"]
+        content="用户希望考上理想的研究生院校，目前正在准备复习，每天都有学习计划。",
+        event_type="考试",
+        summary="用户计划考研",
+        tags=["目标", "长期", "紧张"]
+        # 不再传入 additional_metadata
     )
     
     # 测试临时关注事件保存
@@ -1251,6 +1184,7 @@ if __name__ == "__main__":
         "2025-07-09T23:59:59",
         ["考试", "紧张", "短期焦点"]
     )
+
     
     # 测试搜索功能
     print("\n🔍 测试综合搜索功能:")
