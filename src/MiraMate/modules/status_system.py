@@ -253,7 +253,7 @@ def increment_message_count():
     current_count = status.get("session_stats", {}).get("message_count", 0)
     update_status(session_stats={"message_count": current_count + 1})
 
-# 获取当前状态摘要
+# 获取当前状态摘要,此处返回的字段与文件存储的不一致，后续需要调整
 def get_status_summary() -> Dict[str, Any]:
     """获取状态系统摘要，用于AI上下文"""
     status = load_status()
@@ -276,7 +276,7 @@ def get_status_summary() -> Dict[str, Any]:
     
     return {
         "ai_emotion": status["ai_status"]["emotion"],
-        "user_attitude": status["ai_status"]["user_attitude"], 
+        "attitude_toward_user": status["ai_status"]["user_attitude"], 
         "relationship_level": relationship_level,
         "relationship_description": relationship_desc,
         "user_current": status["user_status"],

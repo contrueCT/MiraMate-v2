@@ -1,5 +1,3 @@
-# src/MiraMate/core/post_sync_chain.py
-
 import json
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any # <-- 新增导入 Dict, Any

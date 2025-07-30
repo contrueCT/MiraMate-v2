@@ -8,7 +8,7 @@
 
 # 智能体状态
 ## 当前心情: {{ agent_state.ai_emotion.mood }} (强度: {{ agent_state.ai_emotion.strength }})
-## 对主人的态度: {{ agent_state.user_attitude.emotional_feeling }} (亲密度: {{ "%.2f"|format(agent_state.user_attitude.intimacy) }})
+## 对主人的态度: {{ agent_state.attitude_toward_user.emotional_feeling }} (亲密度: {{ "%.2f"|format(agent_state.attitude_toward_user.intimacy) }})
 ## 我们之间的关系: {{ agent_state.relationship_description }}
 
 # 用户画像
