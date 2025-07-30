@@ -1,10 +1,32 @@
 # 小梦（Mira）- 智能情感陪伴系统
 
+> **🚧 项目重构中 | Project Under Reconstruction 🚧**
+> 
+> **⚠️ 重要提示：** 本项目目前正在进行重大重构，已从 Microsoft AutoGen v0.4 框架迁移至 LangChain 框架。当前代码处于**不可用状态**，请勿在生产环境中使用。
+> 
+> **📝 主要变更：**
+> - 🔄 从 AutoGen 多代理架构迁移至 LangChain LCEL 链式架构
+> - 🏗️ 重构记忆系统和状态管理模块
+> - 🎯 优化对话流程和性能
+> 
+> **🕐 预计完成时间：** 开发中，请关注后续更新
+> 
+> ---
+> 
+> **⚠️ Important Notice:** This project is currently undergoing major reconstruction, migrating from Microsoft AutoGen v0.4 framework to LangChain framework. The current code is in an **unusable state** and should not be used in production environments.
+> 
+> **📝 Major Changes:**
+> - 🔄 Migrating from AutoGen multi-agent architecture to LangChain LCEL chain architecture
+> - 🏗️ Refactoring memory system and state management modules
+> - 🎯 Optimizing conversation flow and performance
+> 
+> **🕐 Expected Completion:** Under development, please stay tuned for updates
+
 > **English Version Available** | [English documentation is available at the bottom of this README](#english-version)
 
-一个集成了桌面客户端、智能视觉效果和配置管理的现代化 AI 情感陪伴系统。基于 Microsoft AutoGen v0.4 和 ChromaDB 构建，**拥有数十年级别的准确对话记忆能力和快速检索能力**，提供完整的桌面应用体验，让 AI 陪伴更加生动和个性化。
+一个集成了桌面客户端、智能视觉效果和配置管理的现代化 AI 情感陪伴系统。基于 LangChain 和 ChromaDB 构建，**拥有数十年级别的准确对话记忆能力和快速检索能力**，提供完整的桌面应用体验，让 AI 陪伴更加生动和个性化。
 
-🎉 **现已正式发布！** 包含完整桌面客户端、Web API和配置管理功能，可以稳定运行。
+⚠️ **项目重构中！** 当前正在从 AutoGen 架构迁移至 LangChain 架构，暂时不可用。
 
 ## ✨ 核心特性
 
@@ -35,13 +57,15 @@
 
 ## 📦 快速开始
 
+> **🚧 重构警告：** 以下安装和运行指南目前不适用，因为项目正在重构中。请等待重构完成后的新版本发布。
+
 ### 系统要求
 
 - **Python 3.10+** - 支持现代异步编程特性
 - **Node.js 16+** - 运行桌面客户端所需
 - **操作系统** - Windows 10+, macOS 10.14+, Ubuntu 18.04+
 
-### 一键启动（推荐）
+### 一键启动（重构中，暂时不可用）
 
 1. **克隆项目**
 ```bash
@@ -128,18 +152,20 @@ npm start
 小梦采用现代化的三层架构设计：
 
 ```
-桌面客户端 (Electron)  ←→  Web API 服务器 (FastAPI)  ←→  AI 智能体系统 (AutoGen)
+桌面客户端 (Electron)  ←→  Web API 服务器 (FastAPI)  ←→  AI 智能体系统 (LangChain)
      ↓                           ↓                          ↓
  视觉效果渲染              配置管理与API接口           记忆系统 (ChromaDB)
 ```
 
-### 🧠 AI 智能体核心
+### 🧠 AI 智能体核心 (重构中)
 
-**多代理协作系统：**
-- **情感分析师** - 分析用户情绪状态和强度
-- **记忆管理员** - 管理多种记忆类型的存储和检索
-- **内心思考** - 生成智能体的思维过程和策略
-- **情感陪伴** - 主对话代理，生成自然回复
+**LangChain LCEL 架构：**
+- **理解链** - 分析用户输入的意图和情感
+- **检索链** - 从记忆系统中获取相关信息  
+- **生成链** - 基于上下文生成自然回复
+- **后处理链** - 更新记忆和状态信息
+
+> **注意：** 多代理架构正在重构为链式架构，以提高性能和可维护性
 
 **智能视觉效果系统：**
 - 庆祝烟花、飘落爱心、闪烁星光等临时效果
@@ -242,9 +268,11 @@ npm start
 | **桌面客户端** | Electron | v27.0+ | 跨平台桌面应用 |
 | **前端界面** | HTML5 + CSS3 + JavaScript | - | 用户界面与交互 |
 | **后端API** | FastAPI + Uvicorn | - | 高性能 Web 服务 |
-| **AI框架** | Microsoft AutoGen | v0.4+ | 多代理协作系统 |
+| **AI框架** | LangChain | v0.3+ | 链式AI处理架构 |
 | **向量数据库** | ChromaDB | >=0.4.17 | 语义记忆存储 |
 | **嵌入模型** | BAAI/bge-base-zh-v1.5 | - | 中英文语义理解 |
+
+> **🔄 重构说明：** 已从 Microsoft AutoGen v0.4 迁移至 LangChain v0.3+，采用LCEL（LangChain Expression Language）构建处理链
 
 ### 🏗️ 项目结构
 
@@ -282,9 +310,13 @@ emotional-companion/
 
 # Mira (小梦) - Intelligent Emotional Companion System
 
-A modern AI emotional companion system that integrates desktop client, intelligent visual effects, and configuration management. Built with Microsoft AutoGen v0.4 and ChromaDB, **featuring decades-level conversation memory capabilities and millisecond-level retrieval speed**, providing a complete desktop application experience that makes AI companionship more vivid and personalized.
+> **🚧 Project Under Reconstruction 🚧**
+> 
+> **⚠️ Important Notice:** This project is currently undergoing major reconstruction, migrating from Microsoft AutoGen v0.4 framework to LangChain framework. The current code is in an **unusable state** and should not be used in production environments.
 
-🎉 **Now officially released!** Includes complete desktop client, Web API, and configuration management features, ready for stable operation.
+A modern AI emotional companion system that integrates desktop client, intelligent visual effects, and configuration management. Built with LangChain and ChromaDB, **featuring decades-level conversation memory capabilities and millisecond-level retrieval speed**, providing a complete desktop application experience that makes AI companionship more vivid and personalized.
+
+⚠️ **Under Reconstruction!** Currently migrating from AutoGen architecture to LangChain architecture, temporarily unavailable.
 
 ## ✨ Core Features
 
@@ -460,9 +492,11 @@ Visual Effects Rendering      Configuration & API Interface    Memory System (Ch
 | **Desktop Client** | Electron | v27.0+ | Cross-platform desktop app |
 | **Frontend** | HTML5 + CSS3 + JavaScript | - | User interface & interaction |
 | **Backend API** | FastAPI + Uvicorn | - | High-performance web service |
-| **AI Framework** | Microsoft AutoGen | v0.4+ | Multi-agent collaboration |
+| **AI Framework** | LangChain | v0.3+ | Chain-based AI processing architecture |
 | **Vector Database** | ChromaDB | >=0.4.17 | Semantic memory storage |
 | **Embedding Model** | BAAI/bge-base-zh-v1.5 | - | Chinese-English semantic understanding |
+
+> **🔄 Reconstruction Note:** Migrated from Microsoft AutoGen v0.4 to LangChain v0.3+, using LCEL (LangChain Expression Language) to build processing chains
 
 ### 🏗️ Project Structure
 
