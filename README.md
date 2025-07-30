@@ -2,7 +2,7 @@
 
 > **🚧 项目重构中 | Project Under Reconstruction 🚧**
 > 
-> **⚠️ 重要提示：** 本项目目前正在进行重大重构，已从 Microsoft AutoGen v0.4 框架迁移至 LangChain 框架。当前代码处于**不可用状态**，请勿在生产环境中使用。
+> **⚠️ 重要提示：** 本项目目前正在进行重大重构，已从 Microsoft AutoGen v0.4 框架迁移至 LangChain 框架。当前代码处于**不可用状态**。
 > 
 > **📝 主要变更：**
 > - 🔄 从 AutoGen 多代理架构迁移至 LangChain LCEL 链式架构
@@ -13,7 +13,7 @@
 > 
 > ---
 > 
-> **⚠️ Important Notice:** This project is currently undergoing major reconstruction, migrating from Microsoft AutoGen v0.4 framework to LangChain framework. The current code is in an **unusable state** and should not be used in production environments.
+> **⚠️ Important Notice:** This project is currently undergoing major reconstruction, migrating from Microsoft AutoGen v0.4 framework to LangChain framework. The current code is in an **unusable state** .
 > 
 > **📝 Major Changes:**
 > - 🔄 Migrating from AutoGen multi-agent architecture to LangChain LCEL chain architecture
