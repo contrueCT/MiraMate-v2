@@ -10,7 +10,7 @@ from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import JsonOutputParser
 
 # 导入我们需要的模块
-from MiraMate.modules.llms import small_model
+from MiraMate.modules.llms import small_llm
 from MiraMate.modules.memory_system import memory_system
 
 # --- 1. 定义 Prompt 模板 ---
@@ -184,7 +184,7 @@ post_async_chain = (
     # 步骤 2: 将字典送入模板
     | ASYNC_ANALYSIS_PROMPT
     # 步骤 3: 调用小模型生成JSON字符串
-    | small_model
+    | small_llm
     # 步骤 4: 解析JSON字符串为Python字典
     | JsonOutputParser()
     # 步骤 5: 将原始输入合并到解析结果中，以便后续处理

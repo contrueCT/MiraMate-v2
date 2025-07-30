@@ -13,6 +13,7 @@ print("✅ .env 文件已加载 (如果存在)")
 # 使用绝对路径导入，因为我们采用了 src 布局
 from MiraMate.core.pipeline import final_chain, get_memory_for_session
 from MiraMate.core.post_sync_chain import post_sync_chain
+from MiraMate.core.post_async_chain import post_async_chain
 
 # 定义一些颜色，让界面更好看
 class Colors:
@@ -107,6 +108,18 @@ async def run_interactive_session():
                 "ai_response": full_response
             })
             print(f"[同步后处理] 分析完成: {sync_result}")
+
+            # --- 2b. 异步处理 (核心新增部分) ---
+            print("[异步后处理] 正在将记忆分析任务提交到后台...")
+            # 我们使用 asyncio.create_task() 来模拟一个“发射后不管”的后台任务
+            # 这不会阻塞下一次的用户输入
+            asyncio.create_task(
+                post_async_chain.ainvoke({
+                    "conversation_history": history_before_this_turn,
+                    "user_input": user_input,
+                    "ai_response": full_response
+                })
+            )
 
         except Exception as e:
             print(f"\n{Colors.FAIL}错误: 对话链执行失败!{Colors.ENDC}")
