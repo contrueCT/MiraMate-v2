@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableLambda
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import JsonOutputParser
 
@@ -70,6 +70,16 @@ AI: {ai_response}
   }}
 }}
 
+关于这些键的说明：
+- `facts_to_cache`: 包含对话中提到的客观事实，适用于长期记忆，不是指所有客观事实，只需要与用户相关的、重要的、在长期都有意义的事实，比如说用户告诉ai他家是别墅，这是一个长期存在的事实，不需要记录的例子：用户今天吃了什么，但是可以记录用户吃过什么，因为是否吃过什么是一个永久存在的事实。
+- `preferences_to_cache`: 包含对话中提到的用户偏好、喜好或厌恶，适用于长期记忆。
+- `profile_updates_to_cache`: 包含对话中提到的用户画像更新信息，适用于长期记忆。
+- `temp_focus_events_to_add`: 包含对话中提到的短期关注事件，适用于短期记忆。
+
+类似、相关的内容最好整合记录到同一条记录中，除非他们在语义上有明显的区分。
+你只需要提取最新一轮对话中的信息，前面的对话历史仅供参考，帮助你分析。
+如果你要记录有时间信息的内容，请在content部分用自然语言写清楚具体时间，而不是使用模糊的时间描述。
+
 当前日期是: {current_date}
 
 请开始你的分析，并生成JSON输出:
@@ -84,7 +94,7 @@ def format_history_for_prompt(history: list[BaseMessage]) -> str:
         return "（没有更早的对话历史）"
     
     # 只取最近的几轮对话，避免上下文过长
-    recent_history = history[-10:] # 最多取最近5轮对话（10条消息）
+    recent_history = history.copy()
     
     formatted_lines = [f"{'用户' if msg.type == 'human' else 'AI'}: {msg.content}" for msg in recent_history]
     return "\n".join(formatted_lines)
@@ -106,7 +116,7 @@ def _process_analysis_result(analysis_result: dict) -> dict:
                 memory_system.cache_fact_memory(
                     content=fact.get("content", ""), 
                     tags=fact.get("tags", []),
-                    confidence=float(fact.get("confidence", 1.0)) # 确保是浮点数
+                    confidence=float(fact.get("confidence", 1.0)) 
                 )
             processed_summary["facts_cached"] = len(facts_to_cache)
 
@@ -118,7 +128,7 @@ def _process_analysis_result(analysis_result: dict) -> dict:
                     content=pref.get("content", ""), 
                     preference_type=pref.get("type", "未知类型"), 
                     tags=pref.get("tags", []),
-                    confidence=float(pref.get("confidence", 1.0)) # 确保是浮点数
+                    confidence=float(pref.get("confidence", 1.0)) 
                 )
             processed_summary["preferences_cached"] = len(preferences_to_cache)
 
@@ -170,25 +180,28 @@ def _process_analysis_result(analysis_result: dict) -> dict:
 
 # --- 4. 组装完整的异步后处理链 ---
 
+# 这个链条将接收用户输入、AI响应和对话历史，并进行分析和处理。
+analysis_parser_chain = ASYNC_ANALYSIS_PROMPT | small_llm | JsonOutputParser()
+
 # 这个链接收 user_input, ai_response, conversation_history
 post_async_chain = (
-    # 步骤 1: 准备Prompt的输入字典
+    # 一个包含所有初始信息的字典，包括 _original_input
     {
         "conversation_history": lambda x: format_history_for_prompt(x["conversation_history"]),
         "user_input": lambda x: x["user_input"],
         "ai_response": lambda x: x["ai_response"],
         "current_date": lambda x: datetime.now().strftime("%Y-%m-%d"),
-        # 使用一个技巧，将原始输入也传递下去，方便最后一步使用
         "_original_input": lambda x: x
     }
-    # 步骤 2: 将字典送入模板
-    | ASYNC_ANALYSIS_PROMPT
-    # 步骤 3: 调用小模型生成JSON字符串
-    | small_llm
-    # 步骤 4: 解析JSON字符串为Python字典
-    | JsonOutputParser()
-    # 步骤 5: 将原始输入合并到解析结果中，以便后续处理
-    | RunnableLambda(lambda parsed_json, config: {**parsed_json, "_original_input": config["run_manager"].get_context()["input"].get("_original_input")})
-    # 步骤 6: 调用核心处理函数，执行所有副作用
-    | RunnableLambda(_process_analysis_result)
+    # 接收上面准备好的字典，运行 analysis_parser_chain，
+    # 然后将结果以 "analysis_json" 为键，添加到原始字典中。
+    | RunnablePassthrough.assign(analysis_json=analysis_parser_chain)
+    # 现在的输入是一个大字典，例如：{ "user_input": ..., "_original_input": ..., "analysis_json": ... }
+    | RunnableLambda(
+        lambda combined_data: _process_analysis_result({
+            # 提取分析出的 JSON 内容
+            **combined_data["analysis_json"], 
+            "_original_input": combined_data["_original_input"] 
+        })
+    )
 ).with_config(run_name="PostDialogueAsyncChain")
