@@ -1,15 +1,19 @@
-import os  
+from datetime import datetime
+import os
+from typing import List
 from jinja2 import Environment, FileSystemLoader
-from langchain_core.runnables import RunnableLambda, RunnableParallel
+from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnableConfig
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.messages import BaseMessage
 
 
 from MiraMate.modules.llms import main_llm, small_llm  
-from MiraMate.modules.memory_system import memory_system
+from MiraMate.modules.memory_system import memory_system, format_natural_time
 from MiraMate.modules.status_system import get_status_summary 
 from MiraMate.modules.TimeTokenMemory import CustomTokenMemory
+from MiraMate.modules.memory_cache import memory_cache
 
 
 
@@ -47,21 +51,57 @@ def build_system_prompt(context: dict) -> str:
 
 
 # --- 2. 理解链 ---
+# 将用户输入和对话历史格式化为适合理解的字符串
+def format_history_for_understanding(history: List[BaseMessage], max_turns: int = 3) -> str:
+    """
+    将最新的几轮对话历史格式化为字符串，专用于'理解链'。
+    :param history: LangChain的消息列表
+    :param max_turns: 要包含的最大对话轮数 (一轮包含用户和AI的各一条消息)
+    :return: 格式化后的字符串
+    """
+    if not history:
+        return "（无历史对话）"
+    
+    # 截取最后几轮对话 (max_turns * 2 条消息)
+    recent_messages = history[-(max_turns * 2):]
+    
+    # 格式化为 "角色: 内容" 的形式
+    formatted_lines = []
+    for msg in recent_messages:
+        role = "用户" if msg.type == "human" else "AI"
+        formatted_lines.append(f"{role}: {msg.content}")
+    
+    return "\n".join(formatted_lines)
+
+# --- 理解链的Prompt模板 ---
 understanding_prompt = ChatPromptTemplate.from_template(
-    """请分析以下用户输入。
-你的任务是提取用户的核心意图、情感，并生成一个最适合用于向量数据库搜索的查询关键词。
-以严格的JSON格式返回，包含'intent', 'emotion', 'memory_query'三个键。
+    """
+# 任务
+你是一个对话分析专家。你的任务是基于近期的对话历史，深入分析用户的**最新输入**。
+你需要提取其核心意图、情感，并生成一个最适合用于向量数据库检索的精准查询语句。
+
+# 对话历史 (用于理解上下文)
+{conversation_history}
+
+# 核心分析目标 (请重点关注此部分)
 用户最新输入: {user_input}
+
+# 输出要求
+请严格按照JSON格式返回，包含 'intent', 'emotion', 'memory_query' 三个键。
 JSON输出:
 /no_think"""
-
 )
-understanding_chain = (understanding_prompt | small_llm | JsonOutputParser()).with_config(run_name="UnderstandingChain")
+
+
+understanding_chain = (understanding_prompt | small_llm | JsonOutputParser()).with_config(run_name="EnhancedUnderstandingChain")
 
 # --- 3. 最终链条的构建 ---
 # a. 并行获取上下文的组件
 context_fetcher = RunnableParallel(
-    understanding={"user_input": lambda x: x["user_input"]} | understanding_chain,
+    understanding={
+        "user_input": lambda x: x["user_input"],
+        "conversation_history": lambda x: format_history_for_understanding(x["history"])
+    } | understanding_chain,
     agent_state=lambda _: get_status_summary(),
     user_profile=lambda _: memory_system.load_user_profile(),
     focus_events=lambda _: memory_system.get_active_focus_events(),
@@ -69,13 +109,48 @@ context_fetcher = RunnableParallel(
     history=lambda x: x["history"]
 ).with_config(run_name="ParallelContextFetching")
 
-# b. 检索链
-retrieval_chain = RunnableLambda(
-    lambda x: {
-        "retrieved_memory": memory_system.comprehensive_search(x["understanding"]["memory_query"]),
-        **x
+# b. 扩展的检索与缓存逻辑
+def retrieve_and_cache_memories(input_dict: dict, config: RunnableConfig) -> dict:
+    """
+    一个集成了缓存机制的综合记忆检索函数，遵循“先更新，后获取”的清晰流程。
+    
+    步骤:
+    1. 根据用户意图，从ChromaDB检索新的相关记忆。
+    2. 将新检索到的记忆添加或再激活到缓存中。
+    3. 从缓存中获取所有当前有效的记忆（包括刚添加的），并同时对缓存进行衰减。
+    4. 将获取到的记忆列表传递给下一个环节。
+    """
+    # 从LangChain的配置中安全地获取session_id
+    session_id = config.get("configurable", {}).get("session_id", "default_session")
+    query = input_dict["understanding"]["memory_query"]
+
+    # --- 步骤 1: 检索新记忆 ---
+    search_result_dict = memory_system.comprehensive_search(query)
+    newly_searched_memories = [
+        *search_result_dict.get("dialog_memories", []),
+        *search_result_dict.get("fact_memories", []),
+        *search_result_dict.get("preference_memories", []),
+        *search_result_dict.get("event_memories", []),
+    ]
+    
+    # --- 步骤 2: 将新记忆添加/再激活到缓存 ---
+    memory_cache.add_or_reactivate(session_id, newly_searched_memories)
+
+    # --- 步骤 3: 从缓存中获取所有有效记忆并执行衰减 ---
+    # 这一步拿到的就是本轮应该使用的所有相关记忆
+    final_memory_list = memory_cache.get_and_decay(session_id)
+
+    # 将所有信息组装后返回,需要修改系统提示词来适配新的结构
+    return {
+        "retrieved_memory": final_memory_list,
+        **input_dict,
+        "current_time": format_natural_time(datetime.now())
     }
-).with_config(run_name="RetrievalChain")
+
+# 使用新的函数构建检索链
+retrieval_chain = RunnableLambda(retrieve_and_cache_memories).with_config(
+    run_name="RetrievalAndCacheChain"
+)
 
 # c. 格式化最终Prompt输入的函数
 def format_prompt_input(context: dict) -> dict:
