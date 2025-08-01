@@ -39,7 +39,7 @@ def format_natural_time(dt: datetime) -> str:
     else:
         time_period = "深夜"
     
-    return f"{dt.year}年{dt.month}月{dt.day}日{weekday}{time_period}"
+    return f"{dt.year}年{dt.month}月{dt.day}日{weekday}{time_period}{dt.hour}点{dt.minute}分"
 
 # === 📦 二、存储目录设置 ===
 # 使用基于 __file__ 的健壮路径构建方法
