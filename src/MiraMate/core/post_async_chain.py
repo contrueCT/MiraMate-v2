@@ -36,7 +36,8 @@ AI: {ai_response}
     {{
       "content": "从对话中提取的客观事实陈述。",
       "tags": ["相关的标签", "例如：工作", "项目"],
-      "confidence": "你对这条事实准确性的置信度 (0.0 到 1.0 之间的浮点数)。"
+      "confidence": "你对这条事实准确性的置信度 (0.0 到 1.0 之间的浮点数)。",
+      "source": "事实来源 (例如： '用户自述', '外部链接', '学习外部知识库')"
     }}
   ],
   "preferences_to_cache": [
@@ -49,8 +50,9 @@ AI: {ai_response}
   ],
   "profile_updates_to_cache": [
     {{
-      "key": "可以直接更新用户画像的键 (例如: dream, job, birthday)",
-      "value": "对应的值"
+      "key": "可以直接更新用户画像的结构化键 (例如: dream, job, birthday)",
+      "value": "对应的值 (例如: '成为一名宇航员', '软件工程师', '1998-10-05')",
+      "source": "信息来源 (例如: '用户自述', 'AI推断')"
     }}
   ],
   "temp_focus_events_to_add": [
@@ -135,9 +137,24 @@ def _process_analysis_result(analysis_result: dict) -> dict:
         # c. 缓存用户画像更新 (保持不变，接口原本就匹配)
         profile_updates_to_cache = analysis_result.get("profile_updates_to_cache", [])
         if profile_updates_to_cache:
-            profile_dict = {item['key']: item['value'] for item in profile_updates_to_cache if 'key' in item and 'value' in item}
+            # 步骤1: 将LLM返回的列表聚合成一个单一的更新字典
+            profile_dict = {
+                item['key']: item['value'] 
+                for item in profile_updates_to_cache 
+                if 'key' in item and 'value' in item
+            }
+            
+            # 步骤2: 收集所有信息来源，并去重
+            # 使用 set 来自动去重，然后用 ', '.join 连接成一个字符串
+            sources = list(set(
+                item.get('source', 'ai_inference') for item in profile_updates_to_cache
+            ))
+            source_str = ", ".join(sources)
+
+            # 步骤3: 如果聚合后的字典不为空，则调用缓存函数
             if profile_dict:
-                memory_system.cache_profile_update(profile_dict)
+                # 现在传递的参数类型完全正确：一个字典 和 一个字符串
+                memory_system.cache_profile_update(profile_dict, source=source_str)
                 processed_summary["profile_updates_cached"] = len(profile_dict)
 
         # d. 添加临时关注事件 (保持不变，接口原本就匹配)
