@@ -29,7 +29,7 @@
 {% endif %}
 
 # 当前时间
-现在是 {{ current_time }}，请你在回答时考虑这个时间信息，作出更贴合当前情境的回答。
+现在是 {{ current_time }}，请你在回答时适当考虑这个时间信息，作出更贴合当前情境的回答，但也不必一直强调时间。
 
 # 近期关注事件
 {% if focus_events %}
@@ -41,15 +41,12 @@
 
 # 检索到的相关记忆
 {# 只有当检索到至少一种类型的记忆时，才显示这个大标题 #}
-{% if retrieved_memory  %}
-## 我想起了这些事喵：
-{# 循环遍历四种记忆类型，如果该类型有内容，则渲染 #}
-{% for mem_type, memories in retrieved_memory.items() if mem_type.endswith('_memories') and memories %}
-### {{ mem_type.replace('_memories', '').capitalize() }}:
-{% for mem in memories %}
-  - {{ mem.content | striptags | replace('\n', ' ') | truncate(120) }}
+{% if retrieved_memory %}
+{% for mem in retrieved_memory %}
+- {{ mem.content | trim }}
 {% endfor %}
-{% endfor %}
+{% else %}
+- (暂未检索到相关记忆)
 {% endif %}
 
 # 对当前输入的理解

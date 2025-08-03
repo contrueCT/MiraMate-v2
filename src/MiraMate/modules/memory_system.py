@@ -256,7 +256,7 @@ class MemorySystem:
             # 按时间戳倒序排序
             dialog_list.sort(key=lambda x: x["timestamp"], reverse=True)
             
-            return dialog_list[:limit]
+            return dialog_list[:limit*2]
         except Exception as e:
             print(f"❌ 获取最近对话失败: {e}")
             return []
