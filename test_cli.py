@@ -1,10 +1,10 @@
-# test_cli.py
-
+import traceback
 import asyncio
 import os
 import pyfiglet
 from uuid import uuid4
 from dotenv import load_dotenv
+from src.MiraMate.core.idle_processor import IdleProcessor
 
 load_dotenv()
 print("✅ .env 文件已加载 (如果存在)")
@@ -44,6 +44,9 @@ async def run_interactive_session():
     print(f"{Colors.WARNING}新会话已创建，Session ID: {session_id}{Colors.ENDC}\n")
     memory_instance = get_memory_for_session(session_id)
 
+    idle_processor = IdleProcessor(idle_threshold_seconds=1200) # 20分钟
+    idle_processor.start()
+
     in_multiline_mode = False
     multiline_input = []
 
@@ -55,7 +58,14 @@ async def run_interactive_session():
         
         try:
             user_input = input(prompt_text)
+
+            # 更新最后互动时间
+            idle_processor.update_last_interaction_time()
+
         except (KeyboardInterrupt, EOFError):
+            # 停止 idle_processor 线程
+            idle_processor.stop()
+
             print(f"\n{Colors.WARNING}再见！{Colors.ENDC}")
             break
 
@@ -107,7 +117,7 @@ async def run_interactive_session():
                 "user_input": user_input,
                 "ai_response": full_response
             })
-            print(f"[同步后处理] 分析完成: {sync_result}")
+            print(f"[同步后处理] 分析完成")
 
             # --- 2b. 异步处理 (核心新增部分) ---
             print("[异步后处理] 正在将记忆分析任务提交到后台...")
@@ -125,8 +135,7 @@ async def run_interactive_session():
             print(f"\n{Colors.FAIL}错误: 对话链执行失败!{Colors.ENDC}")
             print(f"{Colors.FAIL}{e}{Colors.ENDC}")
             # 在这里可以打印更详细的traceback用于调试
-            # import traceback
-            # traceback.print_exc()
+            traceback.print_exc()
 
         print("-" * 50)
 
