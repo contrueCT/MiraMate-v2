@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv, set_key
 
-from web_api.models import LLMConfig, EnvironmentConfig, UserPreferences, SystemConfig
+from MiraMate.web_api.models import LLMConfig, EnvironmentConfig, UserPreferences, SystemConfig
 
 class ConfigManager:
     """配置管理器 - 支持容器环境"""
@@ -30,7 +30,12 @@ class ConfigManager:
         # 使用环境变量配置目录路径
         self.config_dir = Path(os.getenv('CONFIG_DIR', str(self.project_root / "configs")))
         self.env_file = self.project_root / ".env"
-        self.llm_config_file = self.config_dir / "OAI_CONFIG_LIST.json"
+        
+        # 重构后的配置文件名
+        self.llm_config_file = self.config_dir / "llm_config.json"
+        # 保持向后兼容
+        self.legacy_llm_config_file = self.config_dir / "OAI_CONFIG_LIST.json"
+        
         self.user_config_file = self.config_dir / "user_config.json"
         
         # 确保配置目录存在
@@ -45,13 +50,19 @@ class ConfigManager:
 
     def _ensure_config_files_exist(self):
         """确保配置文件存在，如果不存在则创建默认配置"""
-        # 创建LLM配置文件
+        # 优先检查新的配置文件，如果不存在但旧的存在，则迁移
         if not self.llm_config_file.exists():
-            self._create_default_llm_config()
+            if self.legacy_llm_config_file.exists():
+                # 迁移旧配置到新格式
+                self._migrate_legacy_config()
+            else:
+                # 创建新的默认配置
+                self._create_default_llm_config()
             
         # 创建环境配置文件
         if not self.env_file.exists():
-            self._create_default_env_config()            
+            self._create_default_env_config()
+            
         # 创建用户配置文件
         if not self.user_config_file.exists():
             self._create_default_user_config()
@@ -60,25 +71,13 @@ class ConfigManager:
         """创建默认的LLM配置文件"""
         default_config = [
             {
-                "model": "Qwen/Qwen3-235B-A22B",
+                "model": "Qwen/Qwen2.5-72B-Instruct",
                 "api_key": "",
                 "base_url": "https://api.siliconflow.cn/v1",
                 "api_type": "openai"
             },
             {
-                "model": "Qwen/Qwen3-8B", 
-                "api_key": "",
-                "base_url": "https://api.siliconflow.cn/v1",
-                "api_type": "openai"
-            },
-            {
-                "model": "Qwen/Qwen3-235B-A22B",
-                "api_key": "",
-                "base_url": "https://api.siliconflow.cn/v1", 
-                "api_type": "openai"
-            },
-            {
-                "model": "Qwen/Qwen3-235B-A22B",
+                "model": "Qwen/Qwen2.5-7B-Instruct", 
                 "api_key": "",
                 "base_url": "https://api.siliconflow.cn/v1",
                 "api_type": "openai"
@@ -92,6 +91,22 @@ class ConfigManager:
             print(f"📝 请编辑配置文件并填入你的API密钥")
         except Exception as e:
             print(f"❌ 创建LLM配置文件失败: {e}")
+
+    def _migrate_legacy_config(self):
+        """迁移旧的配置文件格式到新格式"""
+        try:
+            print(f"🔄 发现旧配置文件，正在迁移到新格式...")
+            
+            # 复制旧配置文件内容到新位置
+            shutil.copy2(self.legacy_llm_config_file, self.llm_config_file)
+            
+            print(f"✅ 配置文件迁移完成: {self.llm_config_file}")
+            print(f"💡 旧配置文件已保留: {self.legacy_llm_config_file}")
+            
+        except Exception as e:
+            print(f"❌ 配置文件迁移失败: {e}")
+            # 迁移失败时创建默认配置
+            self._create_default_llm_config()
 
     def _create_default_env_config(self):
         """创建默认的环境配置文件"""
@@ -250,7 +265,7 @@ AGENT_DESCRIPTION="你叫小梦，是梦醒创造出来的ai智能体，你拥�
             
             # 备份所有配置文件
             if self.llm_config_file.exists():
-                shutil.copy2(self.llm_config_file, backup_dir / "OAI_CONFIG_LIST.json")
+                shutil.copy2(self.llm_config_file, backup_dir / "llm_config.json")
             if self.env_file.exists():
                 shutil.copy2(self.env_file, backup_dir / ".env")
             if self.user_config_file.exists():
@@ -269,8 +284,17 @@ AGENT_DESCRIPTION="你叫小梦，是梦醒创造出来的ai智能体，你拥�
                 return False
                 
             # 恢复配置文件
+            # 优先恢复新格式的LLM配置文件
+            llm_restored = False
+            for llm_file_name in ["llm_config.json", "OAI_CONFIG_LIST.json"]:
+                source_file = backup_dir / llm_file_name
+                if source_file.exists() and not llm_restored:
+                    shutil.copy2(source_file, self.llm_config_file)
+                    llm_restored = True
+                    break
+            
+            # 恢复其他配置文件
             for file_name, target_file in [
-                ("OAI_CONFIG_LIST.json", self.llm_config_file),
                 (".env", self.env_file),
                 ("user_config.json", self.user_config_file)
             ]:
@@ -314,3 +338,14 @@ AGENT_DESCRIPTION="你叫小梦，是梦醒创造出来的ai智能体，你拥�
                 
         except Exception as e:
             return False, f"连接测试失败: {str(e)}"
+
+    def get_langchain_llm_configs(self) -> List[Dict[str, Any]]:
+        """获取适用于重构后LangChain架构的配置"""
+        try:
+            if self.llm_config_file.exists():
+                with open(self.llm_config_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return []
+        except Exception as e:
+            print(f"❌ 读取LangChain配置失败: {e}")
+            return []

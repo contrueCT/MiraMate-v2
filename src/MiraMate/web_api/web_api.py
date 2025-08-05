@@ -19,8 +19,12 @@ def early_disable_telemetry():
 # 立即执行环境变量设置
 early_disable_telemetry()
 
+import os
+import sys
 import time
+import json
 import uuid
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from contextlib import asynccontextmanager
@@ -31,27 +35,30 @@ def get_project_root():
     """获取项目根目录，支持容器环境"""
     if os.getenv('DOCKER_ENV'):
         return '/app'
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # 从当前文件位置向上追溯到项目根目录
+    # 当前文件: src/MiraMate/web_api/web_api.py  
+    # 项目根目录: 向上3级
+    current_file = os.path.abspath(__file__)
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
 
 project_root = get_project_root()
 sys.path.insert(0, project_root)
 
-from autogen_core import try_get_known_serializers_for_type
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
 import logging
 
-from emotional_companion.agents.conversation_handler import ConversationHandler
-from web_api.config_manager import ConfigManager
-from web_api.websocket_handler import ws_manager, proactive_service, start_proactive_service
-from web_api.models import (
+from MiraMate.web_api.conversation_adapter import ConversationHandlerAdapter
+from MiraMate.web_api.config_manager import ConfigManager
+from MiraMate.web_api.websocket_handler import ws_manager, proactive_service, start_proactive_service
+from MiraMate.web_api.models import (
     ChatRequest, ChatResponse, EmotionalState, 
     ChatHistory, ChatHistoryItem, HealthStatus, ErrorResponse,
     LLMConfig, EnvironmentConfig, UserPreferences, SystemConfig,
-    ConfigResponse
+    ConfigResponse, StreamChunk
 )
 
 
@@ -59,17 +66,10 @@ class WebAPIServer:
     """Web API 服务器类"""
     
     def __init__(self):
-        # 首先确保遥测完全禁用
-        try:
-            from emotional_companion.utils.disable_telemetry import disable_all_telemetry, disable_urllib3_warnings, suppress_ssl_warnings
-            disable_all_telemetry()
-            disable_urllib3_warnings()
-            suppress_ssl_warnings()
-            print("🛡️ 遥测功能已在WebAPIServer中禁用")
-        except Exception as e:
-            print(f"⚠️ 禁用遥测时出现问题: {e}")
+        # 重构后项目的遥测功能已通过环境变量禁用
+        print("🛡️ 遥测功能已通过环境变量禁用")
         
-        self.conversation_handler: Optional[ConversationHandler] = None
+        self.conversation_handler: Optional[ConversationHandlerAdapter] = None
         self.start_time = time.time()
         self.chat_history: List[ChatHistoryItem] = []
         self.max_history_size = 1000
@@ -79,20 +79,21 @@ class WebAPIServer:
     async def initialize(self):
         """初始化ConversationHandler和WebSocket服务"""
         try:
-            # 使用环境变量或默认路径
+            # 使用新的配置文件名称和路径
             config_path = os.path.join(
                 os.getenv('CONFIG_DIR', os.path.join(project_root, "configs")), 
-                "OAI_CONFIG_LIST.json"
+                "llm_config.json"  # 重构后使用新的配置文件名
             )
             
             # 检查配置文件是否有有效的API密钥
             if self._has_valid_api_keys(config_path):
-                self.conversation_handler = ConversationHandler(config_path)
+                # 使用新的适配器替代原有的ConversationHandler
+                self.conversation_handler = ConversationHandlerAdapter(config_path)
                 
                 # 启动后台任务
                 self.conversation_handler.start_background_tasks()
                 
-                print(f"✅ ConversationHandler初始化成功")
+                print(f"✅ ConversationHandlerAdapter初始化成功")
                 print(f"✅ 配置文件: {config_path}")
             else:
                 print(f"⚠️  API配置不完整，ConversationHandler暂未初始化")
@@ -109,23 +110,36 @@ class WebAPIServer:
             self.conversation_handler = None
     
     def _has_valid_api_keys(self, config_path: str) -> bool:
-        """检查是否有有效的API密钥"""
+        """检查是否有有效的API密钥（适配新的配置文件格式）"""
         try:
-            import json
             if not os.path.exists(config_path):
+                print(f"❌ 配置文件不存在: {config_path}")
                 return False
                 
             with open(config_path, 'r', encoding='utf-8') as f:
+                import json
                 configs = json.load(f)
                 
             if not configs:
+                print(f"❌ 配置文件为空")
                 return False
-                  # 检查是否至少有一个有效的API密钥
+                
+            # 检查是否有有效的API密钥
+            valid_configs = 0
             for config in configs:
-                if config.get('api_key') and config.get('api_key').strip():
-                    return True
-            return False
-        except Exception:
+                api_key = config.get("api_key", "").strip()
+                if api_key and api_key != "":
+                    valid_configs += 1
+            
+            if valid_configs >= 2:  # 至少需要主模型和小模型的配置
+                print(f"✅ 找到 {valid_configs} 个有效的API配置")
+                return True
+            else:
+                print(f"❌ 需要至少2个有效的API配置，当前只有 {valid_configs} 个")
+                return False
+                
+        except Exception as e:
+            print(f"❌ 检查配置时出错: {e}")
             return False
     
     async def cleanup(self):
@@ -135,7 +149,7 @@ class WebAPIServer:
             print("✅ 后台任务已停止")
         
         # 停止WebSocket主动消息服务
-        from web_api.websocket_handler import proactive_service
+        from MiraMate.web_api.websocket_handler import proactive_service
         await proactive_service.stop()
         print("✅ WebSocket服务已停止")
 
@@ -171,10 +185,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 挂载静态文件服务
-web_static_path = os.path.join(project_root, "web")
-if os.path.exists(web_static_path):
-    app.mount("/static", StaticFiles(directory=web_static_path), name="static")
+# 注意：此应用使用Electron客户端，不直接提供web前端
+# mira-desktop/web 目录中的文件是给Electron客户端使用的
+print("💡 此应用使用Electron客户端，不提供直接的web前端访问")
+print(f"🖥️  Electron客户端文件位于: {os.path.join(project_root, 'mira-desktop')}")
 
 
 # ===== WebSocket端点 =====
@@ -250,7 +264,7 @@ async def handle_websocket_message(websocket: WebSocket, message: dict):
 
 
 async def handle_chat_message(websocket: WebSocket, user_message: str):
-    """处理聊天消息"""
+    """处理聊天消息 - 使用流式输出"""
     if not user_message.strip():
         await ws_manager.send_message(websocket, {
             "type": "chat_response",
@@ -268,51 +282,92 @@ async def handle_chat_message(websocket: WebSocket, user_message: str):
     
     if server.conversation_handler:
         try:
-            # 调用AI对话处理器（获取完整响应数据）
-            response_data = await server.conversation_handler.get_response_with_commands(
-                user_message, 
-                enable_timing=True
-            )
+            # 使用流式处理
+            full_response = ""
+            emotional_state = None
+            commands = []
+            start_time = datetime.now()
             
-            # 获取当前情感状态
-            emotional_state = server.conversation_handler.get_current_emotional_state()
-            
-            # 发送AI回复（使用前端期望的数据格式）
+            # 发送开始流式传输消息
             await ws_manager.send_message(websocket, {
-                "type": "chat_response",
-                "data": {   
-                    "response": response_data.get("response", ""),
-                    "emotional_state": emotional_state,
-                    "commands": response_data.get("commands", []),
-                    "processing_time": None  # 可以添加处理时间统计
-                },
+                "type": "chat_stream_start",
                 "timestamp": time.time()
             })
             
-            # 记录到聊天历史
-            history_item = ChatHistoryItem(
-                id=str(uuid.uuid4()),
-                user_message=user_message,
-                ai_response=response_data.get("response", ""),
-                timestamp=datetime.now(),
-                emotional_state=emotional_state
-            )
+            async for chunk_data in server.conversation_handler.get_response_stream(user_message, enable_timing=True):
+                chunk_type = chunk_data.get('type')
+                
+                if chunk_type == "content":
+                    # 累积完整响应
+                    content = chunk_data.get('content', '')
+                    full_response += content
+                    
+                    # 发送内容块
+                    await ws_manager.send_message(websocket, {
+                        "type": "chat_stream_chunk",
+                        "data": {
+                            "content": content,
+                            "chunk_id": chunk_data.get('chunk_id')
+                        },
+                        "timestamp": time.time()
+                    })
+                    
+                elif chunk_type == "metadata":
+                    emotional_state = chunk_data.get('emotional_state')
+                    commands = chunk_data.get('commands', [])
+                    
+                elif chunk_type == "end":
+                    # 发送完整响应（兼容原有客户端）
+                    await ws_manager.send_message(websocket, {
+                        "type": "chat_response",
+                        "data": {
+                            "response": full_response,
+                            "emotional_state": emotional_state,
+                            "commands": commands
+                        },
+                        "timestamp": time.time()
+                    })
+                    
+                    # 发送流结束消息
+                    await ws_manager.send_message(websocket, {
+                        "type": "chat_stream_end",
+                        "data": {
+                            "total_response": full_response,
+                            "processing_complete": True
+                        },
+                        "timestamp": time.time()
+                    })
+                    break
+                    
+                elif chunk_type == "error":
+                    await ws_manager.send_message(websocket, {
+                        "type": "error",
+                        "data": chunk_data.get('message', '处理消息时发生错误'),
+                        "timestamp": time.time()
+                    })
+                    break
             
-            server.chat_history.append(history_item)
-            
-            # 限制历史记录数量
-            if len(server.chat_history) > server.max_history_size:
-                server.chat_history = server.chat_history[-server.max_history_size:]
+            # 添加到聊天历史
+            if full_response:
+                history_item = ChatHistoryItem(
+                    id=str(uuid.uuid4()),
+                    user_message=user_message,
+                    ai_response=full_response,
+                    timestamp=start_time,
+                    emotional_state=emotional_state
+                )
+                
+                server.chat_history.append(history_item)
+                
+                # 限制历史记录数量
+                if len(server.chat_history) > server.max_history_size:
+                    server.chat_history = server.chat_history[-server.max_history_size:]
                 
         except Exception as e:
-            logging.error(f"AI对话处理失败: {e}")
+            logging.error(f"WebSocket聊天处理失败: {e}")
             await ws_manager.send_message(websocket, {
-                "type": "chat_response",
-                "data": {
-                    "response": "抱歉，我刚才走神了...能再说一遍吗？ 😅",
-                    "emotional_state": None,
-                    "commands": []
-                },
+                "type": "error",
+                "data": "处理消息时发生错误",
                 "timestamp": time.time()
             })
     else:
@@ -382,37 +437,158 @@ async def root():
     return {
         "name": "情感陪伴AI Web API",
         "version": "1.0.0",
-        "description": "小梦情感陪伴AI系统的Web API接口",
+        "description": "小梦情感陪伴AI系统的Web API接口 - 为Electron客户端提供服务",
         "docs_url": "/docs",
+        "client_type": "electron",
         "endpoints": {
             "chat": "/api/chat",
             "emotional_state": "/api/emotional-state",
             "chat_history": "/api/chat/history",
-            "health": "/api/health"
+            "health": "/api/health",
+            "config": "/api/config"
+        },
+        "features": {
+            "streaming": "支持流式聊天输出，设置 stream=true",
+            "timing": "支持处理时间统计，设置 enable_timing=true",
+            "emotional_state": "实时情感状态跟踪",
+            "visual_effects": "视觉效果指令生成（开发中）"
         }
     }
 
 
-@app.post("/api/chat", response_model=ChatResponse)
+@app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
     """
-    聊天接口 - 处理用户消息并返回AI回复
+    聊天接口 - 支持流式和非流式输出
     """
     if not server.conversation_handler:
-        raise HTTPException(
-            status_code=503, 
-            detail={
-                "error": "ConversationHandler未初始化",
-                "message": "请先配置API密钥后重启服务",
-                "config_url": "/static/settings.html",
-                "suggestions": [
-                    "1. 通过Web界面配置API密钥: /static/settings.html",
-                    "2. 直接编辑配置文件后重启服务",
-                    "3. 检查API密钥是否正确填写"
-                ]
+        error_detail = {
+            "error": "ConversationHandler未初始化",
+            "message": "请先配置API密钥后重启服务",
+            "config_url": "/api/config",
+            "suggestions": [
+                "1. 通过Electron客户端配置界面设置API密钥",
+                "2. 直接编辑配置文件后重启服务",
+                "3. 检查API密钥是否正确填写"
+            ]
+        }
+        
+        if request.stream:
+            # 流式模式下返回SSE格式的错误
+            async def error_stream():
+                error_chunk = StreamChunk(
+                    type="error",
+                    error="service_unavailable",
+                    message="ConversationHandler未初始化，请先配置API密钥",
+                    timestamp=datetime.now().isoformat()
+                )
+                yield f"data: {error_chunk.model_dump_json()}\n\n"
+            
+            return StreamingResponse(
+                error_stream(),
+                media_type="text/event-stream",
+                status_code=503
+            )
+        else:
+            raise HTTPException(status_code=503, detail=error_detail)
+    
+    if request.stream:
+        # 流式响应
+        return StreamingResponse(
+            generate_chat_stream(request),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # 禁用nginx缓冲
             }
         )
-    
+    else:
+        # 非流式响应（保持原有逻辑）
+        return await handle_non_stream_chat(request)
+
+
+async def generate_chat_stream(request: ChatRequest):
+    """生成流式聊天响应"""
+    try:
+        # 记录开始时间用于历史记录
+        start_time = datetime.now()
+        full_response = ""
+        emotional_state = None
+        commands = []
+        processing_time = None
+        
+        print(f"[DEBUG] 开始流式处理消息: '{request.message}'")
+        
+        # 发送流式数据
+        async for chunk_data in server.conversation_handler.get_response_stream(
+            request.message,
+            enable_timing=request.enable_timing
+        ):
+            print(f"[DEBUG] 从适配器收到数据块: {chunk_data}")
+            
+            # 直接使用字典创建 StreamChunk，避免 Pydantic 序列化问题
+            chunk_type = chunk_data.get('type')
+            
+            # 累积完整响应用于历史记录
+            if chunk_type == "content":
+                content = chunk_data.get('content', '')
+                full_response += content
+                
+            elif chunk_type == "metadata":
+                emotional_state = chunk_data.get('emotional_state')
+                commands = chunk_data.get('commands', [])
+                processing_time = chunk_data.get('processing_time')
+            
+            # 直接序列化字典而不是通过 Pydantic 模型
+            try:
+                json_data = json.dumps(chunk_data, ensure_ascii=False)
+                sse_line = f"data: {json_data}\n\n"
+                print(f"[DEBUG] 发送 SSE 数据: {sse_line.strip()}")
+                yield sse_line
+            except Exception as e:
+                print(f"[DEBUG] JSON序列化失败: {e}, 数据: {chunk_data}")
+                continue
+        
+        print(f"[DEBUG] 流式处理完成，完整回复: '{full_response}'")
+        
+        # 添加到聊天历史（在流结束后）
+        if full_response:
+            chat_id = str(uuid.uuid4())
+            chat_item = ChatHistoryItem(
+                id=chat_id,
+                user_message=request.message,
+                ai_response=full_response,
+                timestamp=start_time,
+                emotional_state=emotional_state
+            )
+            
+            server.chat_history.append(chat_item)
+            # 限制历史记录大小
+            if len(server.chat_history) > server.max_history_size:
+                server.chat_history = server.chat_history[-server.max_history_size:]
+        
+    except Exception as e:
+        print(f"[DEBUG] 流式处理异常: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # 发送错误信息
+        error_data = {
+            "type": "error",
+            "error": "processing_error", 
+            "message": f"处理聊天消息时发生错误: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+        try:
+            json_data = json.dumps(error_data, ensure_ascii=False)
+            yield f"data: {json_data}\n\n"
+        except:
+            yield f"data: {{\"type\": \"error\", \"message\": \"Unknown error\"}}\n\n"
+
+
+async def handle_non_stream_chat(request: ChatRequest) -> JSONResponse:
+    """处理非流式聊天请求（原有逻辑）"""
     try:
         start_time = time.time()
         
@@ -449,7 +625,7 @@ async def chat_endpoint(request: ChatRequest):
         )
         
         server.chat_history.append(chat_item)
-          # 限制历史记录大小
+        # 限制历史记录大小
         if len(server.chat_history) > server.max_history_size:
             server.chat_history = server.chat_history[-server.max_history_size:]
 
@@ -561,10 +737,10 @@ async def health_check():
     健康检查接口 (包含WebSocket状态)
     """
     uptime = time.time() - server.start_time
-      # 检查API配置状态
+    # 检查API配置状态 - 使用新的配置文件路径
     config_path = os.path.join(
         os.getenv('CONFIG_DIR', os.path.join(project_root, "configs")), 
-        "OAI_CONFIG_LIST.json"
+        "llm_config.json"  # 使用新的配置文件名
     )
     has_valid_keys = server._has_valid_api_keys(config_path)
     
@@ -575,7 +751,9 @@ async def health_check():
         "api_config": "healthy" if has_valid_keys else "needs_configuration",
         "websocket_service": "healthy",
         "websocket_connections": str(ws_manager.get_connection_count()),
-        "proactive_service": "running" if proactive_service.is_running else "stopped"
+        "proactive_service": "running" if proactive_service.is_running else "stopped",
+        "background_tasks": "running" if (server.conversation_handler and server.conversation_handler.background_tasks_running) else "stopped",
+        "idle_processor": "active" if (server.conversation_handler and server.conversation_handler.idle_processor) else "inactive"
     }
       # 如果ConversationHandler未初始化但是服务器运行正常，仍然返回部分可用状态
     overall_status = "healthy" if server.conversation_handler else "partial"
@@ -702,9 +880,16 @@ async def update_llm_configs(configs: List[LLMConfig]):
         success = server.config_manager.save_llm_configs(configs)
         
         if success:
+            # 重新初始化ConversationHandler以使用新配置
+            try:
+                await server.initialize()
+                print("✅ 配置更新后ConversationHandler重新初始化成功")
+            except Exception as e:
+                print(f"⚠️ 重新初始化ConversationHandler失败: {e}")
+            
             return ConfigResponse(
                 success=True,
-                message="LLM配置更新成功",
+                message="LLM配置更新成功，系统已重新初始化",
                 config={"configs": [config.dict() for config in configs]}
             )
         else:
@@ -869,9 +1054,16 @@ async def restore_configs(backup_path: str):
         success = server.config_manager.restore_configs(backup_path)
         
         if success:
+            # 重新初始化ConversationHandler以使用恢复的配置
+            try:
+                await server.initialize()
+                print("✅ 配置恢复后ConversationHandler重新初始化成功")
+            except Exception as e:
+                print(f"⚠️ 重新初始化ConversationHandler失败: {e}")
+            
             return ConfigResponse(
                 success=True,
-                message="配置恢复成功",
+                message="配置恢复成功，系统已重新初始化",
                 config=None
             )
         else:
@@ -886,6 +1078,25 @@ async def restore_configs(backup_path: str):
             status_code=500,
             detail=f"恢复配置失败: {str(e)}"
         )
+
+
+@app.post("/api/system/reinitialize", response_model=dict)
+async def reinitialize_system():
+    """
+    手动重新初始化系统（在配置更新后使用）
+    """
+    try:
+        await server.initialize()
+        return {
+            "success": True,
+            "message": "系统重新初始化成功",
+            "conversation_handler_status": "initialized" if server.conversation_handler else "not_initialized"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"系统重新初始化失败: {str(e)}"
+        }
 
 
 if __name__ == "__main__":

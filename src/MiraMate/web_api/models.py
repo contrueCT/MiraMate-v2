@@ -11,6 +11,7 @@ class ChatRequest(BaseModel):
     """聊天请求模型"""
     message: str
     enable_timing: bool = True
+    stream: bool = False  # 新增：是否使用流式输出
 
 
 class ChatResponse(BaseModel):
@@ -20,6 +21,21 @@ class ChatResponse(BaseModel):
     emotional_state: Optional[Dict[str, Any]] = None
     processing_time: Optional[float] = None
     commands: Optional[List[Dict[str, Any]]] = None  # 新增：视觉效果指令列表
+
+
+class StreamChunk(BaseModel):
+    """流式响应数据块模型"""
+    type: str  # "content", "metadata", "end", "error"
+    content: Optional[str] = None  # 内容块（type="content"时使用）
+    chunk_id: Optional[int] = None  # 块ID
+    emotional_state: Optional[Dict[str, Any]] = None  # 情感状态（type="metadata"时使用）
+    commands: Optional[List[Dict[str, Any]]] = None  # 视觉效果指令
+    processing_time: Optional[float] = None  # 处理时间
+    full_response: Optional[str] = None  # 完整响应（type="metadata"时使用）
+    total_chunks: Optional[int] = None  # 总块数
+    error: Optional[str] = None  # 错误类型（type="error"时使用）
+    message: Optional[str] = None  # 错误消息（type="error"时使用）
+    timestamp: str
 
 
 class EmotionalState(BaseModel):
