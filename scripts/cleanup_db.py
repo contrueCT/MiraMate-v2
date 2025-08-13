@@ -19,7 +19,7 @@ def format_record_for_display(record, index):
     """格式化单条记录以便于清晰展示。"""
     doc = record.get('document', 'N/A')
     # 截断过长的文档内容
-    display_doc = (doc[:100] + '...') if len(doc) > 100 else doc
+    display_doc = (doc[:500] + '...') if len(doc) > 100 else doc
     # 尝试解析metadata中的timestamp
     timestamp = record.get('metadata', {}).get('timestamp', 'N/A')
     return f"  [{index}] - {timestamp}\n      Content: {display_doc}"
