@@ -7,32 +7,8 @@ import os
 import sys
 from pathlib import Path
 
-# 在导入其他模块之前先禁用遥测
-def early_disable_telemetry():
-    """在程序最早期禁用遥测功能"""
-    # 设置关键的环境变量
-    os.environ['POSTHOG_DISABLED'] = 'true'
-    os.environ['DO_NOT_TRACK'] = '1'
-    os.environ['TELEMETRY_DISABLED'] = 'true'
-    os.environ['DISABLE_TELEMETRY'] = '1'
-    os.environ['AUTOGEN_TELEMETRY_OPT_OUT'] = '1'
-    
-    # 添加项目根目录到路径以便导入disable_telemetry模块
-    current_dir = Path(__file__).parent.parent
-    if str(current_dir) not in sys.path:
-        sys.path.insert(0, str(current_dir))
-    
-    try:
-        # 重构后项目中没有这个模块，直接设置环境变量即可
-        print("🛡️ 遥测功能已通过环境变量禁用")
-    except Exception as e:
-        print(f"⚠️ 禁用遥测时出现问题: {e}")
-
-# 立即执行遥测禁用
-early_disable_telemetry()
 
 import subprocess
-import asyncio
 import shutil
 
 # Docker环境适配

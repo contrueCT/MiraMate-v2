@@ -3,22 +3,6 @@
 使用FastAPI提供RESTful API接口，连接前端Web界面与后端ConversationHandler
 """
 
-# 尽早禁用遥测功能，避免PostHog等服务的SSL错误
-import os
-import sys
-
-# 在导入其他模块之前先禁用遥测
-def early_disable_telemetry():
-    """在程序最早期禁用遥测功能"""
-    os.environ['POSTHOG_DISABLED'] = 'true'
-    os.environ['DO_NOT_TRACK'] = '1'
-    os.environ['TELEMETRY_DISABLED'] = 'true'
-    os.environ['DISABLE_TELEMETRY'] = '1'
-    os.environ['AUTOGEN_TELEMETRY_OPT_OUT'] = '1'
-
-# 立即执行环境变量设置
-early_disable_telemetry()
-
 import os
 import sys
 import time
