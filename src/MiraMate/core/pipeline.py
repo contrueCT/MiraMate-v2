@@ -18,8 +18,18 @@ from MiraMate.modules.memory_cache import memory_cache
 
 
 # --- 1. System Prompt 构建函数 ---
-CORE_DIR = os.path.dirname(os.path.abspath(__file__))
-MIRA_MATE_ROOT = os.path.abspath(os.path.join(CORE_DIR, '..'))
+def get_project_root():
+    """获取项目根目录，支持Docker环境"""
+    if os.getenv('DOCKER_ENV'):
+        return '/app'
+    # 开发环境：从 core/ 向上3级到项目根目录
+    # 当前文件: src/MiraMate/core/pipeline.py
+    # 项目根目录: 向上3级
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
+
+PROJECT_ROOT = get_project_root()
+MIRA_MATE_ROOT = os.path.join(PROJECT_ROOT, 'src', 'MiraMate')
 PROMPTS_DIR = os.path.join(MIRA_MATE_ROOT, "prompts")
 env = Environment(loader=FileSystemLoader(PROMPTS_DIR))
 system_template = env.get_template('system_prompt.jinja2')

@@ -9,13 +9,18 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from sympy import false
 
-# --- 配置 ---
+# 在文件开头替换现有的路径计算逻辑：
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 2. 从 modules/ 目录向上回溯两层，到达 src/MiraMate/ 的父目录，即项目根目录
-PROJECT_ROOT = os.path.abspath(os.path.join(MODULE_DIR, '..', '..', '..'))
+# 🔥 Docker环境适配
+def get_project_root():
+    """获取项目根目录，支持Docker环境"""
+    if os.getenv('DOCKER_ENV'):
+        return '/app'
+    # 开发环境：从 modules/ 向上3级到项目根目录
+    return os.path.abspath(os.path.join(MODULE_DIR, '..', '..', '..'))
 
-# 3. 在项目根目录下构建指向 configs/llm_config.json 的路径
+PROJECT_ROOT = get_project_root()
 LLM_CONFIG_PATH = os.path.join(PROJECT_ROOT, "configs", "llm_config.json")
 
 def create_llm_from_config(config: Dict[str, Any], is_main_llm: bool = False, **kwargs) -> BaseChatModel:
