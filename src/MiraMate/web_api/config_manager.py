@@ -110,10 +110,7 @@ class ConfigManager:
 
     def _create_default_env_config(self):
         """创建默认的环境配置文件"""
-        default_env_content = """# ChromaDB 配置
-CHROMA_DB_DIR=./memory_db
-
-# 用户配置
+        default_env_content = """# 用户配置
 USER_NAME=小伙伴
 AGENT_NAME=小梦
 
@@ -177,11 +174,7 @@ AGENT_DESCRIPTION="你叫小梦，是梦醒创造出来的ai智能体，你拥�
 
     def get_environment_config(self) -> EnvironmentConfig:
         """获取环境配置"""
-        # 默认使用环境变量中的路径
-        default_db_dir = os.getenv('MEMORY_DB_DIR', '/app/memory_db' if os.getenv('DOCKER_ENV') else './memory_db')
-        
         return EnvironmentConfig(
-            chroma_db_dir=os.getenv('CHROMA_DB_DIR', default_db_dir),
             user_name=os.getenv('USER_NAME', '小伙伴'),
             agent_name=os.getenv('AGENT_NAME', '小梦'),
             agent_description=os.getenv('AGENT_DESCRIPTION', '你是一个可爱的AI助手')
@@ -191,7 +184,6 @@ AGENT_DESCRIPTION="你叫小梦，是梦醒创造出来的ai智能体，你拥�
         """保存环境配置"""
         try:
             # 更新.env文件
-            set_key(self.env_file, 'CHROMA_DB_DIR', config.chroma_db_dir)
             set_key(self.env_file, 'USER_NAME', config.user_name)
             set_key(self.env_file, 'AGENT_NAME', config.agent_name)
             set_key(self.env_file, 'AGENT_DESCRIPTION', config.agent_description)
@@ -313,8 +305,12 @@ AGENT_DESCRIPTION="你叫小梦，是梦醒创造出来的ai智能体，你拥�
             return False, "API密钥不能为空"
         if not config.model or config.model.strip() == "":
             return False, "模型名称不能为空"
-        if not config.base_url or config.base_url.strip() == "":
-            return False, "API地址不能为空"
+        
+        # 对于gemini类型的API，不需要base_url
+        if config.api_type != "gemini":
+            if not config.base_url or config.base_url.strip() == "":
+                return False, "API地址不能为空"
+        
         return True, "配置有效"
 
     def test_llm_connection(self, config: LLMConfig) -> tuple[bool, str]:

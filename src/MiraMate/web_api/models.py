@@ -2,6 +2,7 @@
 Web API 数据模型定义
 """
 
+from token import OP
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 from datetime import datetime
@@ -68,14 +69,13 @@ class LLMConfig(BaseModel):
     """LLM配置模型"""
     model: str
     api_key: str
-    base_url: str
+    base_url: Optional[str] = ""
     api_type: str = "openai"
 
 
 class EnvironmentConfig(BaseModel):
     """环境配置模型"""
-    chroma_db_dir: str = "./memory_db"
-    user_name: str = "梦醒"
+    user_name: str = "小伙伴"
     agent_name: str = "小梦"
     agent_description: str
 
