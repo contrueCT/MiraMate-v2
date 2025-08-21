@@ -71,6 +71,7 @@ class LLMConfig(BaseModel):
     api_key: str
     base_url: Optional[str] = ""
     api_type: str = "openai"
+    model_kwargs: Optional[Dict[str, Any]] = None
 
 
 class EnvironmentConfig(BaseModel):

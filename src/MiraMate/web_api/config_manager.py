@@ -74,13 +74,15 @@ class ConfigManager:
                 "model": "Qwen/Qwen2.5-72B-Instruct",
                 "api_key": "",
                 "base_url": "https://api.siliconflow.cn/v1",
-                "api_type": "openai"
+                "api_type": "openai",
+                "model_kwargs": {"temperature": 0.8}
             },
             {
                 "model": "Qwen/Qwen2.5-7B-Instruct", 
                 "api_key": "",
                 "base_url": "https://api.siliconflow.cn/v1",
-                "api_type": "openai"
+                "api_type": "openai",
+                "model_kwargs": {"temperature": 0.0, "response_format": {"type": "json_object"}}
             }
         ]
         
@@ -310,6 +312,10 @@ AGENT_DESCRIPTION="你叫小梦，是梦醒创造出来的ai智能体，你拥�
         if config.api_type != "gemini":
             if not config.base_url or config.base_url.strip() == "":
                 return False, "API地址不能为空"
+        
+        # 验证 model_kwargs 如果存在的话应该是字典类型
+        if config.model_kwargs is not None and not isinstance(config.model_kwargs, dict):
+            return False, "model_kwargs 必须是字典类型"
         
         return True, "配置有效"
 
