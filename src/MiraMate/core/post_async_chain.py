@@ -1,8 +1,7 @@
 # src/MiraMate/core/post_async_chain.py
 
-import json
-from datetime import datetime, timedelta
-from typing import List, Dict, Any
+import os
+from datetime import datetime
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
@@ -20,13 +19,17 @@ ASYNC_ANALYSIS_PROMPT = ChatPromptTemplate.from_template(
 你是一个高度智能的AI助理，任务是深入分析一段对话，并提取出所有有价值的信息用于记忆和状态更新。
 你必须严格按照指定的JSON格式输出你的分析结果。
 
+# 当前对话信息
+用户: {USER_NAME}
+AI: {AGENT_NAME}
+
 # 对话上下文
 ## 最近的对话历史
 {conversation_history}
 
 ## 最新一轮对话
-用户: {user_input}
-AI: {ai_response}
+{USER_NAME}: {user_input}
+{AGENT_NAME}: {ai_response}
 
 # ----------- 输出格式与任务要求 (这是最重要的部分！) -----------
 你的输出必须是一个JSON对象，包含以下所有键。如果某个键没有可提取的内容，请返回一个空列表 `[]` 或对应的默认值。
@@ -82,6 +85,9 @@ AI: {ai_response}
 你只需要提取最新一轮对话中的信息，前面的对话历史仅供参考，帮助你分析。
 对于提取的信息，你需要考虑的是其重要性和长期价值，不要记录一些临时性的比如“今天的天气”、“正在做某事”这样的内容。
 如果你要记录有时间信息的内容，请在content部分用自然语言写清楚具体时间，而不是使用模糊的时间描述。
+
+重点注意事项！！
+你记录的记忆内容必须是以AI的第一人称视角来描述事件和事实。例如“梦醒和我分享了他开发jingzhuan的进展，我给予了建议。”，在这个例子中梦醒是用户，“我”指的是AI自己。
 
 当前日期是: {current_date}
 
@@ -209,7 +215,9 @@ post_async_chain = (
         "user_input": lambda x: x["user_input"],
         "ai_response": lambda x: x["ai_response"],
         "current_date": lambda x: datetime.now().strftime("%Y-%m-%d"),
-        "_original_input": lambda x: x
+        "_original_input": lambda x: x,
+        "USER_NAME": lambda x: os.getenv("USER_NAME", "小伙伴"),
+        "AGENT_NAME": lambda x: os.getenv("AGENT_NAME", "小梦")
     }
     # 接收上面准备好的字典，运行 analysis_parser_chain，
     # 然后将结果以 "analysis_json" 为键，添加到原始字典中。

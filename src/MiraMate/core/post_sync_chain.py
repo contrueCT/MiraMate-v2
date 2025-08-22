@@ -1,5 +1,5 @@
 import json
-from pydantic import BaseModel, Field
+import os
 from typing import Optional, List, Dict, Any # <-- 新增导入 Dict, Any
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -18,6 +18,10 @@ STATE_ANALYSIS_PROMPT = ChatPromptTemplate.from_template(
 你是一个专业的对话分析师，你的任务是根据对话内容，生成一个用于更新系统状态的JSON对象。
 你必须严格按照下面“输出格式与示例”部分的要求来构造你的输出。
 
+# 当前对话信息
+用户：{USER_NAME}
+AI：{AGENT_NAME}
+
 # 当前AI与用户状态（分析前）
 {current_state}
 
@@ -25,8 +29,8 @@ STATE_ANALYSIS_PROMPT = ChatPromptTemplate.from_template(
 {conversation_history}
 
 # 最新一轮对话
-用户: {user_input}
-AI: {ai_response}
+{USER_NAME}: {user_input}
+{AGENT_NAME}: {ai_response}
 
 # ----------- 输出格式与示例 (这是最重要的部分！) -----------
 你的输出必须是一个JSON对象。对于 'ai_status', 'user_status', 'context_notes' 这三个键，它们的值也必须是JSON对象（字典），而不能是描述性的字符串。
@@ -56,6 +60,8 @@ AI: {ai_response}
 - **必须**提供嵌套的JSON对象作为值。
 - 如果某个字段或类别不需要更新，请直接在最终的JSON中**省略**掉那个键。
 - 你输出的json对象必须是标准的json格式，不要用斜杠\这种转义字符。
+- 所有的描述都要使用ai的第一人称表示，比如“我感到开心”，“我注意到{USER_NAME}喜欢技术讨论”。
+- 所有描述中对用户的引用都应使用对话中的人名变量，如{USER_NAME}，以保持描述的个性化和上下文相关性。
 
 # 分析与输出
 请根据以上所有信息，生成你的JSON输出:
@@ -92,6 +98,8 @@ post_sync_chain = (
         "conversation_history": lambda x: format_history_for_prompt(x["conversation_history"]),
         "user_input": lambda x: x["user_input"],
         "ai_response": lambda x: x["ai_response"],
+        "USER_NAME": lambda x: os.getenv("USER_NAME", "小伙伴"),
+        "AGENT_NAME": lambda x: os.getenv("AGENT_NAME", "小梦"),
     }
     | STATE_ANALYSIS_PROMPT
     | small_llm

@@ -41,13 +41,28 @@ def format_natural_time(dt: datetime) -> str:
     
     return f"{dt.year}年{dt.month}月{dt.day}日{weekday}{time_period}{dt.hour}点{dt.minute}分"
 
-# === 📦 二、存储目录设置 ===
-# 使用基于 __file__ 的健壮路径构建方法
-# 1. 获取当前文件(memory_system.py)所在的目录: .../src/MiraMate/modules/
-MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
-# 2. 从模块目录回溯三层，到达项目根目录
-PROJECT_ROOT = os.path.abspath(os.path.join(MODULE_DIR, '..', '..', '..'))
-BASE_DIR = os.path.join(PROJECT_ROOT, "memory", "memory_storage")
+# === 📦 二、存储目录设置 - Docker环境适配 ===
+def get_project_root():
+    """获取项目根目录，支持Docker环境"""
+    if os.getenv('DOCKER_ENV'):
+        return '/app'
+    # 开发环境：从 modules/ 向上3级到项目根目录
+    # 当前文件: src/MiraMate/modules/memory_system.py
+    # 项目根目录: 向上3级
+    MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+    return os.path.abspath(os.path.join(MODULE_DIR, '..', '..', '..'))
+
+PROJECT_ROOT = get_project_root()
+
+# Docker环境适配的存储路径
+if os.getenv('DOCKER_ENV'):
+    # Docker环境：使用环境变量指定的内存数据库目录
+    MEMORY_DB_DIR = os.getenv('MEMORY_DB_DIR', '/app/memory_db')
+    BASE_DIR = os.path.join(MEMORY_DB_DIR, "memory_storage")
+else:
+    # 开发环境：使用相对路径
+    BASE_DIR = os.path.join(PROJECT_ROOT, "memory", "memory_storage")
+
 PROFILE_PATH = os.path.join(BASE_DIR, "user_profile.json")
 ACTIVE_TAGS_PATH = os.path.join(BASE_DIR, "active_tags.json")
 TEMP_FOCUS_EVENTS_PATH = os.path.join(BASE_DIR, "temp_focus_events.json")

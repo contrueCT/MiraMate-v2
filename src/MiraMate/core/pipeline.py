@@ -89,12 +89,14 @@ understanding_prompt = ChatPromptTemplate.from_template(
 # 任务
 你是一个对话分析专家。你的任务是基于近期的对话历史，深入分析用户的**最新输入**。
 你需要提取其核心意图、情感，并生成一个最适合用于向量数据库检索的精准查询语句。
+数据库中的记忆内容是以AI的第一人称视角记录的，比如“今天梦醒遇到了一个问题来和我分享，我安慰了他”，这里的“我”指的是AI自己，你需要根据这一点来调整你的查询语句。
 
 # 对话历史 (用于理解上下文)
 {conversation_history}
 
 # 核心分析目标 (请重点关注此部分)
 用户最新输入: {user_input}
+当前时间: {current_time}
 
 # 输出要求
 请严格按照JSON格式返回，包含 'intent', 'emotion', 'memory_query' 三个键。
@@ -110,7 +112,8 @@ understanding_chain = (understanding_prompt | small_llm | JsonOutputParser()).wi
 context_fetcher = RunnableParallel(
     understanding={
         "user_input": lambda x: x["user_input"],
-        "conversation_history": lambda x: format_history_for_understanding(x["history"])
+        "conversation_history": lambda x: format_history_for_understanding(x["history"]),
+        "current_time": lambda _: format_natural_time(datetime.now())
     } | understanding_chain,
     agent_state=lambda _: get_status_summary(),
     user_profile=lambda _: memory_system.load_user_profile(),
