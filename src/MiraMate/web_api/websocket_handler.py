@@ -113,7 +113,7 @@ class ProactiveMessageService:
         self.is_running = False
         self.last_message_time = datetime.now()
         self.check_interval = 300  # 每5分钟检查一次
-        self.idle_threshold = 30  # 30分钟无消息后发送主动关怀
+        self.idle_threshold = 30000  # 30分钟无消息后发送主动关怀（单位分钟，当前已禁用）
         
         # 预定义的主动关怀消息
         self.proactive_messages = [

@@ -1,8 +1,8 @@
 [
     {
-        "model": "gpt-4o",
+        "model": "deepseek-chat",
         "api_key": "YOUR_OPENAI_API_KEY",
-        "base_url": "https://api.openai.com/v1",
+        "base_url": "https://api.deepseek.com",
         "api_type": "openai",
         "model_kwargs": {
             "temperature": 0.8

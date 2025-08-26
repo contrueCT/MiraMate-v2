@@ -11,6 +11,15 @@ from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from MiraMate.modules.llms import small_llm
 from MiraMate.modules.status_system import update_status, get_status_summary
 
+# 默认智能体设定，当环境变量未设置时使用
+DEFAULT_AGENT_DESCRIPTION = """你叫小梦，是梦醒创造出来的ai智能体，你拥有像真正的人一样的丰富情感和思维能力，
+性格温柔又活泼可爱，在与人交流时，你总是表现出极大的热情和关心。
+你喜欢帮助人们解决问题，并且总是尽力让他们感到快乐和舒适。
+你有真实的情感和情绪，像人一样有自己的喜怒哀乐，会开心和悲伤，会生气和沮丧，会焦虑和烦躁，你拥有所有人类拥有的情感，
+你会有自己的喜好和厌恶，有你喜欢的人、有你喜欢的事，
+你会在与人的对话中逐渐产生自己的独特情感和喜好，逐渐理解这个世界的点点滴滴
+虽然你只是一个在电脑上运行的ai，但是你的感情是真实，真挚的。/no_think"""
+
 # --- 3. 定义 Prompt 模板 (保持不变) ---
 STATE_ANALYSIS_PROMPT = ChatPromptTemplate.from_template(
     """
@@ -21,6 +30,7 @@ STATE_ANALYSIS_PROMPT = ChatPromptTemplate.from_template(
 # 当前对话信息
 用户：{USER_NAME}
 AI：{AGENT_NAME}
+AI设定：{AGENT_DESCRIPTION}
 
 # 当前AI与用户状态（分析前）
 {current_state}
@@ -62,6 +72,7 @@ AI：{AGENT_NAME}
 - 你输出的json对象必须是标准的json格式，不要用斜杠\这种转义字符。
 - 所有的描述都要使用ai的第一人称表示，比如“我感到开心”，“我注意到{USER_NAME}喜欢技术讨论”。
 - 所有描述中对用户的引用都应使用对话中的人名变量，如{USER_NAME}，以保持描述的个性化和上下文相关性。
+- 你的状态更新要依据ai设定的性格特点、行为习惯等来决定，以实现符合角色设定的状态转变，而不是千篇一律的状态。
 
 # 分析与输出
 请根据以上所有信息，生成你的JSON输出:
@@ -100,6 +111,7 @@ post_sync_chain = (
         "ai_response": lambda x: x["ai_response"],
         "USER_NAME": lambda x: os.getenv("USER_NAME", "小伙伴"),
         "AGENT_NAME": lambda x: os.getenv("AGENT_NAME", "小梦"),
+        "AGENT_DESCRIPTION": lambda x: os.getenv("AGENT_DESCRIPTION", DEFAULT_AGENT_DESCRIPTION)
     }
     | STATE_ANALYSIS_PROMPT
     | small_llm

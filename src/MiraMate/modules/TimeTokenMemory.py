@@ -8,6 +8,8 @@ from typing import List, Dict, Any
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_core.chat_history import BaseChatMessageHistory
 
+from MiraMate.modules.memory_system import format_natural_time
+
 # 导入tiktoken用于自动计算token
 import tiktoken
 
@@ -83,7 +85,7 @@ class CustomTokenMemory(BaseChatMessageHistory):
 
     def _add_message(self, message: BaseMessage, token_count: int) -> None:
         new_item = {
-            "message": message,
+            "message": f"{message.content} 【{format_natural_time(time.time())}】",
             "timestamp": time.time(),
             "token_count": token_count
         }
