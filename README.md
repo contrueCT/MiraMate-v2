@@ -1,290 +1,226 @@
-# 小梦（Mira）- 智能情感陪伴系统
+# 小梦（Mira）- 智能情感陪伴 / 长期人格智能体 (MiraMate v2)
 
-> **🚧 项目重构中 | Project Under Reconstruction 🚧**
-> 
-> **⚠️ 重要提示：** 本项目目前正在进行重大重构，已从 Microsoft AutoGen v0.4 框架迁移至 LangChain 框架。当前代码处于**不可用状态**。
-> 
-> **📝 主要变更：**
-> - 🔄 从 AutoGen 多代理架构迁移至 LangChain LCEL 链式架构
-> - 🏗️ 重构记忆系统和状态管理模块
-> - 🎯 优化对话流程和性能
-> 
-> **🕐 预计完成时间：** 开发中，请关注后续更新
-> 
-> ---
-> 
-> **⚠️ Important Notice:** This project is currently undergoing major reconstruction, migrating from Microsoft AutoGen v0.4 framework to LangChain framework. The current code is in an **unusable state** .
-> 
-> **📝 Major Changes:**
-> - 🔄 Migrating from AutoGen multi-agent architecture to LangChain LCEL chain architecture
-> - 🏗️ Refactoring memory system and state management modules
-> - 🎯 Optimizing conversation flow and performance
-> 
-> **🕐 Expected Completion:** Under development, please stay tuned for updates
+[English](./README.en.md) | **简体中文**
 
-> **English Version Available** | [English documentation is available at the bottom of this README](#english-version)
+> 当前版本：v2.0.0 （LangChain 架构稳定运行）
+> 
+> 本项目不是一个“普通的聊天程序”，目标：构建一个可长期运行、逐步形成稳定人格、具备情绪与关系演化、拥有“自主内在活动”能力的类人格 AI 智能体。它不仅被动回答用户输入，还能在空闲时整理记忆、维护状态、巩固偏好、规划未来关注点，从而呈现出连续与成长感。
 
-一个集成了桌面客户端、智能视觉效果和配置管理的现代化 AI 情感陪伴系统。基于 LangChain 和 ChromaDB 构建，**拥有数十年级别的准确对话记忆能力和快速检索能力**，提供完整的桌面应用体验，让 AI 陪伴更加生动和个性化。
+---
 
-⚠️ **项目重构中！** 当前正在从 AutoGen 架构迁移至 LangChain 架构，暂时不可用。
+## 🎯 项目定位与设计理念
+
+与常见的“记一次聊一次”型助手不同，小梦强调：
+
+1. 长期连续性（Temporal Continuity）：记忆 + 状态 + 人格设定 三层协同，避免“重置感”。
+2. 渐进式人格（Emergent Persona）：通过偏好、重大事件、关系等级与情感轨迹不断调整回应风格。
+3. 自主内部循环（Autonomous Internal Cycle）：空闲时可执行记忆整理、缓存固化、关系与情绪衰减或巩固、未来事件关注强化。
+4. 结构化语义记忆（Structured Semantic Memory）：对话记录 / 事实知识 / 用户偏好 / 重大事件 / 短期关注事件 分层持久化与快速检索。
+5. 语义检索 + 上下文裁剪：结合“理解链 → 检索链 → 生成链 → 后处理”流水式 LCEL 结构，保证响应速度与相关性。
+
+---
 
 ## ✨ 核心特性
 
-### 🖥️ 桌面客户端体验
-- **原生桌面应用** - 基于 Electron 的跨平台桌面客户端，支持 Windows/Mac/Linux
-- **美观现代界面** - 自定义标题栏、动态背景装饰、响应式布局设计
-- **智能视觉效果** - AI 可控制的动态视觉效果，包括烟花、爱心、星光等多种特效
-- **多主题支持** - 温暖、清凉、夕阳、夜晚、春日等多种主题，营造不同氛围
+### 🧠 记忆与人格
+- 多层记忆：对话日志（含语境描述头）、事实记忆、偏好、重大事件、临时关注事件
+- 语义检索：基于 bge-base-zh-v1.5 + ChromaDB（HNSW）毫秒级相似度查询
+- 记忆缓存层：短期会话级激活记忆 TTL 衰减与再激活（避免重复向量检索，提升相关性与效率）
+- 事实 & 偏好缓存 → 空闲固化：先写缓冲 JSON，后异步固化到向量库
+- 重点事件与临时关注：支持过期清理、定向提醒/上下文强化
 
-### 🎨 智能视觉效果系统
-- **AI 控制特效** - 智能体可根据对话内容和情感状态自动触发相应视觉效果
-- **丰富效果库** - 包含庆祝烟花、飘落爱心、闪烁星光、漂浮气泡、花瓣飞舞等多种效果
-- **自适应强度** - 效果强度可根据情感程度自动调节
-- **关键词触发** - 智能识别对话中的关键词，触发相关视觉效果
+### 💬 对话链路（LCEL）
+- 理解链：对最近 n 轮对话进行意图 / 情感解析 + 构造专用 memory_query（与第一人称记忆视角对齐）
+- 并行上下文获取：状态系统摘要 + 用户画像 + 关注事件 + 语义检索
+- 检索链：综合搜索 + 记忆缓存更新 + TTL 衰减
+- 生成链：System Prompt（Jinja2 模板）+ 上下文记忆 + 主模型流式生成
+- 消息历史：自定义 Token 记忆（保留长对话上下文，同时控制 token 上限与时间连续性）
 
-### ⚙️ 可视化配置管理
-- **图形化配置界面** - 在客户端中直接配置 AI 模型、环境变量和用户偏好
-- **多模型支持** - 支持 OpenAI、Qwen、自定义 API 等多种 LLM 配置
-- **配置备份恢复** - 一键备份和恢复所有配置，确保数据安全
-- **实时连接测试** - 验证 API 配置的有效性
+### 😶‍🌫️ 情绪与关系状态系统
+- 双维度：AI 当前情绪（情感类型 + 强度） / 对用户的情感态度（情感标签 + 亲密度 0~1）
+- 关系等级 1~10：带非线性递增阻尼，防止“速刷好感”
+- 事件驱动：显著亲密变化会写入关系历史，可选固化为事实记忆
+- 主题标签：最近话题标签统计 + 高频标签活跃度统计
 
-### 🧠 智能记忆与情感系统
-- **超长期记忆能力** - 基于 ChromaDB 的语义检索，可准确记忆和快速查询数十年的对话历史
-- **智能记忆管理** - 自动提取关键信息，永久保存重要时刻和用户偏好
-- **情感状态模型** - 动态情感变化，支持多种情绪和关系亲密度系统（1-10级）
-- **多代理协作** - 基于 Microsoft AutoGen v0.4 的专业代理系统
-- **主动关怀机制** - 智能体会主动发起关怀对话和回忆分享
+### 🧩 系统 Prompt 生态
+- 环境变量自定义：AGENT_NAME / USER_NAME / AGENT_DESCRIPTION
+- 模板化人格：默认人格提供真实情绪 + 渐进形成偏好逻辑
+- 自动注入：状态摘要、聚合记忆、用户画像片段、当前时间自然语言化描述
+
+### ⚙️ 模型管理
+- 多模型协作：主模型（创造 / 流式）+ 次模型（结构化 / JSON 分析）
+- 支持 OpenAI 协议 / Gemini（ChatGoogleGenerativeAI）
+- 独立配置文件：`configs/llm_config.json`
+
+### 🗂️ 数据与持久化
+- 存储层：`memory/memory_storage/` 下分离 profile / cache / focus / active_tags / chroma_db
+- HNSW 参数：cosine + M=32 + construction_ef=256
+- 离线模式：设置 `TRANSFORMERS_OFFLINE=1` 时可在已缓存权重场景离线嵌入（需本地模型缓存）
+
+### 🔄 空闲活动（可扩展）
+- 预留 idle/background 结构：可接入定时任务（APS cheduler）执行：缓存固化、关系自然衰减、关注事件提醒、事实合并、画像合并
+
+### 🛠️ 部署友好
+- Docker 环境变量适配（路径切换 / DOCKER_ENV）
+- 依赖自动检查（web_api 启动脚本）
+- prompt、模型、存储目录均显式化可配置
 
 ## 📦 快速开始
 
-> **🚧 重构警告：** 以下安装和运行指南目前不适用，因为项目正在重构中。请等待重构完成后的新版本发布。
+### 1. 环境要求
 
-### 系统要求
+- Python 3.13.3（项目已锁定此版本；如需兼容请自行测试调整）
+- 可用的 OpenAI 兼容模型 或 Google Gemini API Key（建议：主模型高质量，次模型快速稳定）
+- 可选：GPU（嵌入默认 CPU，可自行修改为 GPU 设备）
 
-- **Python 3.10+** - 支持现代异步编程特性
-- **Node.js 16+** - 运行桌面客户端所需
-- **操作系统** - Windows 10+, macOS 10.14+, Ubuntu 18.04+
+### 2. 克隆与安装
 
-### 一键启动（重构中，暂时不可用）
-
-1. **克隆项目**
 ```bash
-git clone https://github.com/yourusername/emotional-companion.git
-cd emotional-companion
+git clone https://github.com/contrueCT/MiraMate.git
+cd MiraMate
+python -m venv .venv
+./.venv/Scripts/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -e .[dev]
 ```
 
-2. **安装依赖**
+或使用 uv（推荐快速 + 可复现）：
+
 ```bash
-# 使用 UV 安装（推荐）
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv
 uv pip install -e .
-
-# 或使用 Pip 安装
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
-pip install -e .
 ```
 
-3. **安装桌面客户端依赖**
-```bash
-cd mira-desktop
-npm install
-cd ..
-```
+### 3. 配置模型 (`configs/llm_config.json`)
 
-4. **配置 API 密钥**
-
-系统需要配置 4 个 API 接口，请编辑 `configs/OAI_CONFIG_LIST.json` 文件：
-
+示例：
 ```json
 [
     {
-        "model": "Qwen/Qwen3-235B-A22B",
-        "api_key": "your-api-key-here",
-        "base_url": "https://api.siliconflow.cn/v1",
-        "api_type": "openai"
+        "model": "gpt-4o",
+        "api_key": "YOUR_OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1",
+        "api_type": "openai",
+        "model_kwargs": {"temperature": 0.8}
     },
     {
-        "model": "Qwen/Qwen3-8B",
-        "api_key": "your-api-key-here", 
-        "base_url": "https://api.siliconflow.cn/v1",
-        "api_type": "openai"
-    },
-    {
-        "model": "Qwen/Qwen3-235B-A22B",
-        "api_key": "your-api-key-here",
-        "base_url": "https://api.siliconflow.cn/v1", 
-        "api_type": "openai"
-    },
-    {
-        "model": "Qwen/Qwen3-235B-A22B",
-        "api_key": "your-api-key-here",
-        "base_url": "https://api.siliconflow.cn/v1",
-        "api_type": "openai"
+        "model": "gemini-1.5-flash-latest",
+        "api_key": "YOUR_GEMINI_API_KEY",
+        "api_type": "gemini",
+        "model_kwargs": {"temperature": 0.0}
     }
 ]
 ```
 
-> **建议：** 第二个API可以使用较小的模型（如 Qwen/Qwen3-8B）以节省成本，第四个API使用次弱的模型，第三个API使用次次弱的模型，第一个API使用最强的模型，不建议全部使用参数量大的模型，不建议使用不支持非推理模式的模型，本项目代码对qwen3这样支持推理和非推理模型的api进行了特殊配置以让模型保持在非推理状态，使用推理模型/推理模式并不能增强本项目智能体的实际表现
+说明：
+- 第 1 条 = 主模型（用于最终回应，默认开启流式 / 创造性）
+- 第 2 条 = 次模型（意图分析 / JSON 输出，低温高确定性）
+- 不提供次模型时，会回退复用主模型
 
-5. **启动系统**
-```bash
-# 启动 Web API 服务器
-python web_api/start_web_api.py
+### 4. 可选：自定义人格/名称
 
-# 在新终端中启动桌面客户端
-cd mira-desktop
-npm start
+在系统环境变量或 `.env` 中设置：
+```
+AGENT_NAME=小梦
+USER_NAME=小伙伴
+AGENT_DESCRIPTION=（自定义第二人称描述，支持多段文本）
 ```
 
-### 使用体验
+### 5. 启动 Web API
 
-启动后您将看到：
-- **智能对话** - 支持情感理解和记忆回顾的自然交流
-- **视觉效果** - 根据对话内容自动触发的动态特效
-- **配置管理** - 点击设置按钮可直接配置系统参数
-- **主题切换** - 多种视觉主题营造不同对话氛围
+```bash
+python src/MiraMate/web_api/start_web_api.py
+```
+
+启动后：
+- 健康检查: http://127.0.0.1:8000/api/health
+- Swagger 文档: http://127.0.0.1:8000/docs
+
+（如使用 Docker，可自行编写 Dockerfile：将 `src/` 复制进容器并设置 `DOCKER_ENV=1` 即可）
+
+### 6. 集成 / 交互
+
+可直接使用已完成的官方桌面客户端（Electron + Vue）：
+https://github.com/contrueCT/MiraMate-v2-client
+
+或自行二次开发：
+- 自定义桌面 / Web 前端 UI
+- 状态面板（读取 `memory/status_storage/status.json` 与统计接口）
+- 事件提醒器（轮询临时关注事件 / focus events）
+
+### 7. 基础调用（伪示例）
+
+（具体 API 路由请查看 `web_api/web_api.py` 与 `conversation_adapter.py`）
+
+---
 
 ## 🏗️ 系统架构
 
-小梦采用现代化的三层架构设计：
-
 ```
-桌面客户端 (Electron)  ←→  Web API 服务器 (FastAPI)  ←→  AI 智能体系统 (LangChain)
-     ↓                           ↓                          ↓
- 视觉效果渲染              配置管理与API接口           记忆系统 (ChromaDB)
+┌──────────────────────────┐
+│        外部客户端        │  ← 可自建 UI / 桌面 / 移动 / Bot
+└─────────────┬────────────┘
+                            │ HTTP / WebSocket (可扩展)
+┌─────────────▼────────────┐
+│        Web API (FastAPI) │  会话入口 / 健康检查 / 适配层
+└─────────────┬────────────┘
+                            │ 调用 LCEL 链
+┌─────────────▼────────────┐
+│   对话流水线 (LCEL)       │  理解 → 检索+缓存 → Prompt → 生成
+└─────────────┬────────────┘
+                            │ 记忆 / 状态读写
+┌─────────────▼────────────┐
+│  记忆系统 + 状态系统     │  ChromaDB + JSON 状态 & 缓存
+└─────────────┬────────────┘
+                            │ 嵌入
+┌─────────────▼────────────┐
+│ SentenceTransformer(bge) │
+└──────────────────────────┘
 ```
 
-### 🧠 AI 智能体核心 (重构中)
-
-**LangChain LCEL 架构：**
-- **理解链** - 分析用户输入的意图和情感
-- **检索链** - 从记忆系统中获取相关信息  
-- **生成链** - 基于上下文生成自然回复
-- **后处理链** - 更新记忆和状态信息
-
-> **注意：** 多代理架构正在重构为链式架构，以提高性能和可维护性
-
-**智能视觉效果系统：**
-- 庆祝烟花、飘落爱心、闪烁星光等临时效果
-- 温暖、清凉、夕阳、夜晚、春日等主题背景
-- 基于关键词和情感状态的智能触发
-
-**向量化记忆系统：**
-- 基于 BAAI/bge-base-zh-v1.5 的语义理解，支持数十年级别的对话记忆存储  
-- ChromaDB 持久化存储和闪电级检索，毫秒内从海量记忆中精准定位
-- 智能记忆分层管理：短期记忆、长期记忆、核心记忆永久保存
-- 支持记忆衰减、重要性加权和联想机制，确保关键信息永不丢失
-
-### �️ 安全与稳定性
-
-**配置安全：**
-- API 密钥加密存储和传输
-- 配置文件权限控制
-- 敏感信息脱敏显示
-
-**系统稳定性：**
-- 异常处理和错误恢复
-- 内存泄漏防护
-- 优雅降级机制
-
+### 关键模块
+- `core/pipeline.py`：主链路（并行上下文获取 + 检索缓存 + Prompt + 生成）
+- `modules/memory_system.py`：语义记忆持久化与多类型管理
+- `modules/memory_cache.py`：会话级激活记忆 TTL 衰减缓存
+- `modules/status_system.py`：情绪 / 关系等级 / 上下文注释 / 标签 / 历史
+- `modules/llms.py`：模型装载（主 + 次）及动态配置模板生成
+- `modules/TimeTokenMemory.py`：自定义 Token/时间约束消息历史
+- `web_api/`：启动脚本 / 配置管理器 / 适配器
 
 ## 🎯 重点功能
 
-### 🎨 智能视觉效果
+### 记忆类型速览
+- 对话日志：含语境摘要头（主题 / 情感 / 标签 / 时间）+ 原始回合
+- 事实记忆：结构化抽象事实（含来源与置信度）
+- 用户偏好：类型化（音乐 / 娱乐 / 生活方式...）片段
+- 重大事件：带概要 + 详细内容 + 标签
+- 临时关注事件：带过期时间（考试 / 纪念日 / 聚会等）
+- 活跃标签：动态统计最近主题热度
 
-**AI 驱动的动态效果：**
-- **情感联动** - 根据对话情绪自动触发相应视觉效果
-- **关键词识别** - 智能识别"庆祝"、"开心"、"浪漫"等触发词
-- **效果丰富** - 包含 12+ 种精美动画效果
+### 人格演化与状态
+- 亲密度（0~1）与关系等级（1~10）双轨表示
+- 情绪强度对生成风格（可在 Prompt 层自定义扩展）
+- 关系跃迁自动记录，可自动固化为事实记忆
 
-**支持的视觉效果：**
-- 🎆 **庆祝烟花** - 适用于成功、庆祝、开心时刻
-- 💕 **飘落爱心** - 表达爱意、温馨、浪漫情感
-- ✨ **闪烁星光** - 营造梦幻、神奇的氛围
-- 🫧 **漂浮气泡** - 轻松、愉快的互动场景
-- 🌸 **花瓣飞舞** - 优雅、浪漫的对话时刻
-
-### 🎭 多主题界面
-
-**丰富的视觉主题：**
-- 🔥 **温暖主题** - 暖色调光斑，营造温馨氛围
-- ❄️ **清凉主题** - 冷色调波纹，带来清爽感受
-- 🌅 **夕阳主题** - 橙红渐变，模拟夕阳西下
-- 🌙 **夜晚主题** - 动态星空，深色护眼模式
-- 🌸 **春日主题** - 清新绿调，充满生机活力
-
-### ⚙️ 配置管理
-
-**多模型支持：**
-- 使用OPENAI的API接口协议的大模型
-- 自定义 API 端点配置
-- 实时连接状态检测
-
-**个性化设置：**
-- 用户名称和 AI 助手名称
-- AI 性格设定和角色描述
-- 界面主题和语言偏好
-- 功能开关和通知设置
-
-**安全备份：**
-- 一键备份所有配置
-- 历史版本管理
-- 快速恢复功能
-
-### 🧠 智能记忆与学习
-
-**深度记忆能力：**
-- **用户档案** - 生日、家庭、职业等基本信息
-- **偏好记录** - 兴趣爱好、习惯和喜好
-- **情感历程** - 情感状态变化和重要时刻
-- **关系发展** - 亲密度变化和关系里程碑
-
-**智能学习机制：**
-- 自动提取对话中的关键信息
-- 基于时间和重要性的记忆衰减
-- 支持记忆联想和主动回忆
-- 情感状态影响记忆权重
-
-### 🤖 多代理协作
-
-**专业化分工：**
-每个代理都有明确的职责和专业领域，协作完成复杂的情感交互任务
-
-**智能决策：**
-多个代理共同分析和决策，确保回复的准确性和情感适当性
-
-**效率优化：**
-并行处理和异步执行，确保快速响应用户需求
 
 ## 📝 技术栈与架构
 
-## � 技术栈
+### 技术栈
 
 | 层级 | 技术选型 | 版本要求 | 主要用途 |
 |------|----------|----------|----------|
-| **桌面客户端** | Electron | v27.0+ | 跨平台桌面应用 |
-| **前端界面** | HTML5 + CSS3 + JavaScript | - | 用户界面与交互 |
+| **接口层** | FastAPI + Uvicorn | - | Web API 服务 |
 | **后端API** | FastAPI + Uvicorn | - | 高性能 Web 服务 |
 | **AI框架** | LangChain | v0.3+ | 链式AI处理架构 |
 | **向量数据库** | ChromaDB | >=0.4.17 | 语义记忆存储 |
 | **嵌入模型** | BAAI/bge-base-zh-v1.5 | - | 中英文语义理解 |
+| **调度** | APScheduler | - | 后台周期任务 (可扩展) |
+| **模板** | Jinja2 | - | System Prompt 模板化 |
+| **Tokenizer** | tiktoken | - | Token 计数与控制 |
 
-> **🔄 重构说明：** 已从 Microsoft AutoGen v0.4 迁移至 LangChain v0.3+，采用LCEL（LangChain Expression Language）构建处理链
+> 已完成从 Microsoft AutoGen v0.4 多代理架构 → LangChain LCEL 统一流水线的迁移
 
-### 🏗️ 项目结构
 
-```
-emotional-companion/
-├── 🖥️  mira-desktop/          # 桌面客户端 (Electron)
-├── 🌐 web_api/               # Web API 服务 (FastAPI)
-├── 🧠 emotional_companion/   # AI 智能体核心 (AutoGen)
-├── 📁 configs/              # 配置文件
-├── 📊 logs/                 # 日志文件
-└── 🗃️  memory_db/           # 记忆数据库
-```
 
 
 
@@ -304,224 +240,4 @@ emotional-companion/
 
 **小梦正在等待与您的第一次对话，开始一段特别的友谊之旅吧！** ✨
 
----
-
-# English Version
-
-# Mira (小梦) - Intelligent Emotional Companion System
-
-> **🚧 Project Under Reconstruction 🚧**
-> 
-> **⚠️ Important Notice:** This project is currently undergoing major reconstruction, migrating from Microsoft AutoGen v0.4 framework to LangChain framework. The current code is in an **unusable state** and should not be used in production environments.
-
-A modern AI emotional companion system that integrates desktop client, intelligent visual effects, and configuration management. Built with LangChain and ChromaDB, **featuring decades-level conversation memory capabilities and millisecond-level retrieval speed**, providing a complete desktop application experience that makes AI companionship more vivid and personalized.
-
-⚠️ **Under Reconstruction!** Currently migrating from AutoGen architecture to LangChain architecture, temporarily unavailable.
-
-## ✨ Core Features
-
-### 🖥️ Desktop Client Experience
-- **Native Desktop App** - Cross-platform desktop client based on Electron, supporting Windows/Mac/Linux
-- **Beautiful Modern Interface** - Custom title bar, dynamic background decorations, responsive layout design
-- **Intelligent Visual Effects** - AI-controllable dynamic visual effects including fireworks, hearts, starlight, and more
-- **Multi-theme Support** - Warm, cool, sunset, night, spring themes to create different atmospheres
-
-### 🎨 Intelligent Visual Effects System
-- **AI-Controlled Effects** - AI can automatically trigger appropriate visual effects based on conversation content and emotional state
-- **Rich Effect Library** - Includes celebration fireworks, falling hearts, twinkling stars, floating bubbles, flower petals, and more
-- **Adaptive Intensity** - Effect intensity automatically adjusts based on emotional degree
-- **Keyword Triggers** - Intelligently recognizes keywords in conversation to trigger related visual effects
-
-### ⚙️ Visual Configuration Management
-- **Graphical Configuration Interface** - Configure AI models, environment variables, and user preferences directly in the client
-- **Multi-model Support** - Supports OpenAI, Qwen, custom APIs, and other LLM configurations
-- **Configuration Backup & Restore** - One-click backup and restore of all configurations for data security
-- **Real-time Connection Testing** - Verify API configuration validity
-
-### 🧠 Intelligent Memory & Emotional System
-- **Ultra-Long-Term Memory** - Accurate memory and lightning-fast retrieval of decades of conversation history based on ChromaDB
-- **Intelligent Memory Management** - Automatically extracts key information, permanently stores important moments and user preferences  
-- **Emotional State Model** - Dynamic emotional changes, supporting multiple emotions and relationship intimacy system (1-10 levels)
-- **Multi-agent Collaboration** - Professional agent system based on Microsoft AutoGen v0.4
-- **Proactive Care Mechanism** - AI actively initiates caring conversations and memory sharing
-
-## 📦 Quick Start
-
-### System Requirements
-
-- **Python 3.10+** - Supports modern async programming features
-- **Node.js 16+** - Required for running desktop client
-- **Operating System** - Windows 10+, macOS 10.14+, Ubuntu 18.04+
-
-### One-Click Launch (Recommended)
-
-1. **Clone the project**
-```bash
-git clone https://github.com/yourusername/emotional-companion.git
-cd emotional-companion
-```
-
-2. **Install dependencies**
-```bash
-# Using UV (recommended)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv
-uv pip install -e .
-
-# Or using Pip
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or venv\Scripts\activate  # Windows
-pip install -e .
-```
-
-3. **Install desktop client dependencies**
-```bash
-cd mira-desktop
-npm install
-cd ..
-```
-
-4. **Configure API Keys**
-
-The system requires 4 API interfaces. Please edit the `configs/OAI_CONFIG_LIST.json` file:
-
-```json
-[
-    {
-        "model": "gpt-4",
-        "api_key": "your-api-key-here",
-        "base_url": "https://api.openai.com/v1",
-        "api_type": "openai"
-    },
-    {
-        "model": "gpt-3.5-turbo",
-        "api_key": "your-api-key-here", 
-        "base_url": "https://api.openai.com/v1",
-        "api_type": "openai"
-    },
-    {
-        "model": "gpt-4",
-        "api_key": "your-api-key-here",
-        "base_url": "https://api.openai.com/v1", 
-        "api_type": "openai"
-    },
-    {
-        "model": "gpt-4",
-        "api_key": "your-api-key-here",
-        "base_url": "https://api.openai.com/v1",
-        "api_type": "openai"
-    }
-]
-```
-
-> **Note:** The second API can use a smaller model (like gpt-3.5-turbo) to save costs. The other three are recommended to use gpt-4 for better performance.
-
-5. **Launch System**
-```bash
-# Start Web API server
-python web_api/start_web_api.py
-
-# In a new terminal, start desktop client
-cd mira-desktop
-npm start
-```
-
-### User Experience
-
-After launching, you will see:
-- **Welcome Interface** - Mira actively greets and introduces features
-- **Intelligent Conversation** - Natural communication supporting emotional understanding and memory recall
-- **Visual Effects** - Dynamic effects automatically triggered based on conversation content
-- **Configuration Management** - Click settings button to directly configure system parameters
-- **Theme Switching** - Multiple visual themes creating different conversation atmospheres
-
-## 🏗️ System Architecture
-
-Mira adopts a modern three-tier architecture:
-
-```
-Desktop Client (Electron)  ←→  Web API Server (FastAPI)  ←→  AI Agent System (AutoGen)
-        ↓                            ↓                           ↓
-Visual Effects Rendering      Configuration & API Interface    Memory System (ChromaDB)
-```
-
-### 🧠 AI Agent Core
-
-**Multi-agent Collaboration System:**
-- **Emotion Analyzer** - Analyzes user emotional states and intensity
-- **Memory Manager** - Manages storage and retrieval of various memory types
-- **Inner Thoughts** - Generates AI's thinking processes and strategies
-- **Emotional Companion** - Main dialogue agent that generates natural responses
-
-**Intelligent Visual Effects System:**
-- Celebration fireworks, falling hearts, twinkling stars and other temporary effects
-- Warm, cool, sunset, night, spring themed backgrounds
-- Intelligent triggering based on keywords and emotional states
-
-**Vectorized Memory System:**
-- Semantic understanding based on BAAI/bge-base-zh-v1.5, supporting decades-level conversation memory storage
-- ChromaDB persistent storage and lightning-fast retrieval, precisely locating from massive memories within milliseconds
-- Intelligent memory hierarchy management: short-term, long-term, and core memories permanently preserved
-- Supports memory decay, importance weighting, and associative mechanisms, ensuring critical information is never lost
-
-## 🎯 Feature Highlights
-
-### 🎨 Intelligent Visual Effects
-
-**Supported Visual Effects:**
-- 🎆 **Celebration Fireworks** - For success, celebration, happy moments
-- 💕 **Falling Hearts** - Express love, warmth, romantic emotions
-- ✨ **Twinkling Starlight** - Create dreamy, magical atmosphere
-- 🫧 **Floating Bubbles** - Relaxed, pleasant interactive scenarios
-- 🌸 **Flying Petals** - Elegant, romantic conversation moments
-
-### 🎭 Multi-theme Interface
-
-**Rich Visual Themes:**
-- 🔥 **Warm Theme** - Warm-toned light spots, creating cozy atmosphere
-- ❄️ **Cool Theme** - Cool-toned ripples, bringing refreshing feel
-- 🌅 **Sunset Theme** - Orange-red gradient, simulating sunset
-- 🌙 **Night Theme** - Dynamic starry sky, dark eye-protection mode
-- 🌸 **Spring Theme** - Fresh green tones, full of vitality
-
-## 📝 Technology Stack
-
-| Layer | Technology | Version | Purpose |
-|-------|------------|---------|---------|
-| **Desktop Client** | Electron | v27.0+ | Cross-platform desktop app |
-| **Frontend** | HTML5 + CSS3 + JavaScript | - | User interface & interaction |
-| **Backend API** | FastAPI + Uvicorn | - | High-performance web service |
-| **AI Framework** | LangChain | v0.3+ | Chain-based AI processing architecture |
-| **Vector Database** | ChromaDB | >=0.4.17 | Semantic memory storage |
-| **Embedding Model** | BAAI/bge-base-zh-v1.5 | - | Chinese-English semantic understanding |
-
-> **🔄 Reconstruction Note:** Migrated from Microsoft AutoGen v0.4 to LangChain v0.3+, using LCEL (LangChain Expression Language) to build processing chains
-
-### 🏗️ Project Structure
-
-```
-emotional-companion/
-├── 🖥️  mira-desktop/          # 桌面客户端 (Electron)
-├── 🌐 web_api/               # Web API 服务 (FastAPI)
-├── 🧠 emotional_companion/   # AI 智能体核心 (AutoGen)
-├── 📁 configs/              # 配置文件
-├── 📊 logs/                 # 日志文件
-└── 🗃️  memory_db/           # 记忆数据库
-```
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-Welcome to submit Issues and Pull Requests to help improve Mira!
-
-## 💬 Feedback
-
-If you encounter problems or have suggestions during use, please feel free to create an Issue or contact the developer.
-
----
-
-**Mira is waiting for your first conversation, let's start a special journey of friendship!** ✨
+（英文版请见 / English version: [README.en.md](./README.en.md)）
