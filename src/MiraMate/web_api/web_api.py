@@ -14,7 +14,6 @@ from typing import Dict, List, Optional
 from contextlib import asynccontextmanager
 
 # 添加项目根目录到Python路径
-# Docker容器化路径修改
 def get_project_root():
     """获取项目根目录，支持容器环境"""
     if os.getenv('DOCKER_ENV'):
@@ -50,9 +49,6 @@ class WebAPIServer:
     """Web API 服务器类"""
     
     def __init__(self):
-        # 重构后项目的遥测功能已通过环境变量禁用
-        print("🛡️ 遥测功能已通过环境变量禁用")
-        
         self.conversation_handler: Optional[ConversationHandlerAdapter] = None
         self.start_time = time.time()
         self.chat_history: List[ChatHistoryItem] = []

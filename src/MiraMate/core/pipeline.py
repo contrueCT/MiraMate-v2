@@ -51,7 +51,6 @@ def build_system_prompt(context: dict) -> str:
     # 创建一个上下文副本以避免修改原始字典
     render_context = context.copy()
     
-    # --- 新增：从环境变量读取自定义配置 ---
     # os.getenv() 的第二个参数是默认值，如果环境变量不存在，则使用默认值
     render_context['AGENT_NAME'] = os.getenv("AGENT_NAME", "小梦")
     render_context['USER_NAME'] = os.getenv("USER_NAME", "小伙伴")
@@ -160,7 +159,6 @@ def retrieve_and_cache_memories(input_dict: dict, config: RunnableConfig) -> dic
         "current_time": format_natural_time(datetime.now())
     }
 
-# 使用新的函数构建检索链
 retrieval_chain = RunnableLambda(retrieve_and_cache_memories).with_config(
     run_name="RetrievalAndCacheChain"
 )
@@ -196,7 +194,6 @@ session_memories = {}
 def get_memory_for_session(session_id: str):
     """根据 session_id 获取或创建独立的记忆实例。"""
     if session_id not in session_memories:
-        # 关键修改：现在我们直接调用标准的 __init__ 方法
         session_memories[session_id] = CustomTokenMemory(
             llm_model_name="gpt-4o", # 可以从配置或环境变量读取
             max_token_limit=100000,

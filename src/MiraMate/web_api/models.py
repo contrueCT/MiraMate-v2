@@ -12,7 +12,7 @@ class ChatRequest(BaseModel):
     """聊天请求模型"""
     message: str
     enable_timing: bool = True
-    stream: bool = False  # 新增：是否使用流式输出
+    stream: bool = False  
 
 
 class ChatResponse(BaseModel):
@@ -21,7 +21,7 @@ class ChatResponse(BaseModel):
     timestamp: datetime
     emotional_state: Optional[Dict[str, Any]] = None
     processing_time: Optional[float] = None
-    commands: Optional[List[Dict[str, Any]]] = None  # 新增：视觉效果指令列表
+    commands: Optional[List[Dict[str, Any]]] = None  
 
 
 class StreamChunk(BaseModel):

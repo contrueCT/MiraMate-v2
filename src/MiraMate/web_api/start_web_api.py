@@ -1,8 +1,6 @@
 """
 Web API服务器启动脚本 - 支持Docker容器化
 """
-
-# 尽早禁用遥测功能，避免PostHog等服务的SSL错误
 import os
 import sys
 from pathlib import Path

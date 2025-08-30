@@ -177,7 +177,7 @@ class MemorySystem:
             "topic": topic,
             "sentiment": sentiment,
             "importance": importance,
-            "tags": json.dumps(tags, ensure_ascii=False) # tags 也保留，方便用 where={"tags": {"$contains": "某个标签"}} 过滤
+            "tags": json.dumps(tags, ensure_ascii=False)
         }
         
         if additional_metadata:
@@ -187,7 +187,7 @@ class MemorySystem:
             self.collections["dialog_logs"].add(
                 ids=[dialog_id],
                 metadatas=[metadata],
-                documents=[dialog_content] # 使用新的、内容更丰富的 document
+                documents=[dialog_content]
             )
             print(f"✅ 对话记录已保存: {topic} (重要性: {importance})")
             self.update_active_tags(tags)
@@ -224,7 +224,7 @@ class MemorySystem:
                 for i, doc_content in enumerate(docs_list):
                     if i < len(distances_list):
                         distance = distances_list[i]
-                        if distance <= threshold:  # 只保留相似度高于阈值的结果
+                        if distance <= threshold: 
                             metadata = metadatas_list[i]
                             # 解析标签
                             tags = json.loads(metadata.get("tags", "[]"))
@@ -287,10 +287,8 @@ class MemorySystem:
         natural_time = format_natural_time(datetime.now())
         tags_str = "、".join(tags) if tags else "无"
 
-        # [核心修改] 将标签、来源等信息融入文档
         fact_content = f"[事实记忆] 这是一条记录于 {natural_time} 的事实，来源是“{source}”，相关标签为“{tags_str}”。事实内容：{content}"
         
-        # [核心修改] metadata 只保留用于过滤的字段
         metadata = {
             "type": "fact",
             "timestamp": timestamp,
@@ -306,7 +304,7 @@ class MemorySystem:
             self.collections["facts"].add(
                 ids=[fact_id],
                 metadatas=[metadata],
-                documents=[fact_content] # 使用新的 document
+                documents=[fact_content]
             )
             print(f"✅ 事实记忆已保存: {content[:30]}... (置信度: {confidence})")
             self.update_active_tags(tags)
@@ -426,7 +424,6 @@ class MemorySystem:
             "timestamp": get_iso_timestamp(),
             "natural_time": format_natural_time(datetime.now()),
             "content_length": len(content)
-            # "additional_metadata" 相关的键和逻辑被移除
         }
         
         facts_cache = self._load_cache_file(FACT_CACHE_PATH)
@@ -537,13 +534,11 @@ class MemorySystem:
         natural_time = format_natural_time(datetime.now())
         tags_str = "、".join(tags) if tags else "无"
 
-        # [核心修改] 将类型、标签等信息融入文档
         preference_content = f"[用户偏好] 这是一条记录于 {natural_time} 的关于用户的偏好信息，类型为“{preference_type}”，相关标签为“{tags_str}”。偏好内容：{content}"
         
-        # [核心修改] metadata 只保留用于过滤的字段
         metadata = {
-            "type": "preference", # 统一使用'preference'作为大类
-            "preference_type": preference_type, # 保留具体的子类型用于过滤
+            "type": "preference",
+            "preference_type": preference_type,
             "tags": json.dumps(tags, ensure_ascii=False),
             "timestamp": timestamp
         }
@@ -555,7 +550,7 @@ class MemorySystem:
             self.collections["user_preferences"].add(
                 ids=[preference_id],
                 metadatas=[metadata],
-                documents=[preference_content] # 使用新的 document
+                documents=[preference_content]
             )
             print(f"✅ 用户偏好已保存: {preference_type} - {content[:30]}...")
             self.update_active_tags(tags)
@@ -629,14 +624,12 @@ class MemorySystem:
         natural_time = format_natural_time(datetime.now())
         tags_str = "、".join(tags) if tags else "无"
 
-        # [核心修改] 将所有关键信息融入文档，特别是概要
         event_content = f"[重大事件] 这是一条记录于 {natural_time} 的重大事件。事件类型为“{event_type}”，概要是“{summary}”，相关标签为“{tags_str}”。\n\n[详细内容]\n{content}"
         
-        # [核心修改] metadata 只保留用于过滤的字段
         metadata = {
             "type": "important_event",
             "event_type": event_type,
-            "summary": summary, # 概要可以保留，方便预览
+            "summary": summary,
             "tags": json.dumps(tags, ensure_ascii=False),
             "timestamp": timestamp
         }
@@ -648,7 +641,7 @@ class MemorySystem:
             self.collections["important_events"].add(
                 ids=[event_id],
                 metadatas=[metadata],
-                documents=[event_content] # 使用新的 document
+                documents=[event_content]
             )
             print(f"✅ 重大事件已保存: {event_type} - {summary}")
             self.update_active_tags(tags)
@@ -804,7 +797,8 @@ class MemorySystem:
 
     def clear_expired_focus_events(self):
         """手动清理过期的关注事件"""
-        valid_events = self.load_temp_focus_events()  # 这会自动清理过期事件
+        # 根据过期机制自动清理
+        valid_events = self.load_temp_focus_events()
         return len(valid_events)
 
     # === 🔖 活跃标签 ===
@@ -942,6 +936,7 @@ class MemorySystem:
         
         return stats
 
+    # TODO 未实现功能，未来考虑开发
     def cleanup_old_memories(self, days_threshold: int = 30, 
                            importance_threshold: float = 0.3):
         """清理旧的低重要性记忆（可选功能）"""
@@ -950,10 +945,6 @@ class MemorySystem:
         from datetime import timedelta
         cutoff_date = (datetime.now() - timedelta(days=days_threshold)).isoformat()
         
-        # 这里可以实现具体的清理逻辑
-        # 注意：ChromaDB的删除操作需要谨慎处理
-        print("⚠️ 清理功能待实现，建议手动管理重要记忆")
-
 
 # === 🧩 全局实例和便捷函数 ===
 
@@ -986,17 +977,6 @@ def save_temp_focus_event(content: str, event_time: str, expire_time: str, tags:
 def search_memories(query: str, n_results: int = 5):
     """便捷的记忆搜索函数"""
     return memory_system.comprehensive_search(query, n_results=n_results)
-
-def parse_response_with_llm(response_text: str) -> Dict:
-    """模拟LLM解析响应（待接入真实LLM）"""
-    # 这里应该调用你的LLM来解析用户输入
-    # 目前返回示例数据
-    return {
-        "topic": "流萤和星星",
-        "sentiment": "温柔",
-        "importance": 0.9,
-        "tags": ["流萤", "浪漫", "崩坏星穹铁道"]
-    }
 
 # === 🎯 全局便捷函数（缓存版本）===
 
@@ -1069,165 +1049,3 @@ def clear_all_caches():
     """便捷函数：清空所有缓存"""
     memory_system = get_memory_system()
     return memory_system.clear_all_caches()
-
-# 示例使用缓存功能
-def test_cache_system():
-    """测试缓存系统"""
-    print("🧪 测试缓存系统...")
-    
-    # 测试缓存用户偏好
-    cache_user_preference(
-        content="用户喜欢听古典音乐，特别是贝多芬的作品",
-        preference_type="音乐偏好",
-        tags=["音乐", "古典", "贝多芬"],
-        confidence=0.9
-    )
-    
-    cache_user_preference(
-        content="用户喜欢听古典音乐和轻音乐",
-        preference_type="音乐偏好", 
-        tags=["音乐", "古典", "轻音乐"],
-        confidence=0.8
-    )
-    
-    # 测试缓存事实记忆
-    cache_fact_memory(
-        content="用户的生日是3月15日",
-        tags=["个人信息", "生日"],
-        source="对话",
-        confidence=1.0
-    )
-    
-    cache_fact_memory(
-        content="用户生日在春天，具体是3月中旬",
-        tags=["个人信息", "生日", "春天"],
-        source="对话",
-        confidence=0.7
-    )
-    
-    # 测试缓存用户画像
-    cache_profile_update({
-        "age_range": "25-30",
-        "interests": ["音乐", "读书", "旅行"],
-        "personality": "内向但友善"
-    })
-    
-    cache_profile_update({
-        "location": "北京",
-        "occupation": "程序员"
-    })
-    
-    # 显示缓存状态
-    get_cache_status()
-    
-    # 测试读取缓存
-    print("\n� 测试读取缓存:")
-    prefs = load_preference_cache()
-    facts = load_fact_cache()
-    profile = load_profile_cache()
-    
-    print(f"用户偏好缓存: {len(prefs)} 条")
-    print(f"事实记忆缓存: {len(facts)} 条")
-    print(f"用户画像缓存: {len(profile)} 条")
-    
-    # 可以选择性清理某个缓存
-    # clear_preference_cache()  # 注释掉，仅做演示
-    
-    print("✅ 缓存系统测试完成!")
-
-# === 🧪 用例测试 ===
-if __name__ == "__main__":
-    print("🚀 初始化记忆系统测试...")
-    
-    # 测试用户画像（按照修改方案的结构）
-    user_profile_example = {
-        "basic": {
-            "name": "小明",
-            "gender": "男",
-            "birthday": "2000-01-01"
-        },
-        "identity": {
-            "roles": ["计算机专业学生", "吉他初学者"],
-            "job": "学生",
-            "dream": "制作自己的AI伴侣",
-            "care_about_people": ["妈妈", "闺蜜"]
-        }
-    }
-    memory_system.save_user_profile(user_profile_example)
-    
-    # 测试对话记录保存
-    memory_data = parse_response_with_llm("我真的超级喜欢流萤，她就像一颗在夜里发光的星星……")
-    
-    dialog_id = memory_system.save_dialog_log(
-        user_input="我真的超级喜欢流萤，她就像一颗在夜里发光的星星……",
-        ai_response="哇，主人说得好温柔喵~ 流萤真的就是那样治愈人心的存在~",
-        topic=memory_data["topic"],
-        sentiment=memory_data["sentiment"],
-        importance=memory_data["importance"],
-        tags=memory_data["tags"]
-    )
-    
-    # 测试事实记忆保存
-    fact_id = memory_system.save_fact_memory(
-        content="主人喜欢流萤和星星的意象，认为她很治愈。", 
-        tags=["流萤", "星星", "治愈"],
-        confidence=0.9 # 确保传入了 confidence
-        # 不再传入 additional_metadata
-    )
-    
-    # 测试用户偏好保存
-    preference_id = memory_system.save_user_preference(
-        content="用户喜欢轻松搞笑的动画番剧，最喜欢的是《孤独摇滚》。",
-        preference_type="娱乐",
-        tags=["番剧", "搞笑", "轻松"]
-        # 不再传入 additional_metadata
-    )
-    
-    # 测试重大事件保存
-    event_id = memory_system.save_important_event(
-        content="用户希望考上理想的研究生院校，目前正在准备复习，每天都有学习计划。",
-        event_type="考试",
-        summary="用户计划考研",
-        tags=["目标", "长期", "紧张"]
-        # 不再传入 additional_metadata
-    )
-    
-    # 测试临时关注事件保存
-    temp_event_saved = memory_system.save_temp_focus_event(
-        "用户将于7月8日参加英语四级考试",
-        "2025-07-08",
-        "2025-07-09T23:59:59",
-        ["考试", "紧张", "短期焦点"]
-    )
-
-    
-    # 测试搜索功能
-    print("\n🔍 测试综合搜索功能:")
-    search_results = memory_system.comprehensive_search("流萤")
-    print(f"搜索到 {len(search_results['dialog_memories'])} 条对话记录")
-    print(f"搜索到 {len(search_results['fact_memories'])} 条事实记忆")
-    print(f"搜索到 {len(search_results['preference_memories'])} 条用户偏好")
-    print(f"搜索到 {len(search_results['event_memories'])} 条重大事件")
-    print(f"搜索到 {len(search_results['focus_events'])} 条关注事件")
-    
-    # 显示统计信息
-    print("\n📊 记忆系统统计:")
-    stats = memory_system.get_memory_statistics()
-    print(f"对话记录: {stats['dialog_count']} 条")
-    print(f"事实记忆: {stats['fact_count']} 条")
-    print(f"用户偏好: {stats['preference_count']} 条")
-    print(f"重大事件: {stats['event_count']} 条")
-    print(f"关注事件: {stats['focus_event_count']} 条")
-    print(f"活跃标签: {stats['active_tags']['unique_count']} 个")
-    
-    # 测试关注事件管理
-    print("\n⏰ 测试关注事件管理:")
-    focus_events = memory_system.get_active_focus_events()
-    for i, event in enumerate(focus_events):
-        print(f"事件 {i}: {event['content'][:50]}... (过期时间: {event['expire_time']})")
-    
-    # 测试缓存系统
-    print("\n🗂️ 测试缓存系统:")
-    test_cache_system()
-    
-    print("\n✅ 记忆系统测试完成！")

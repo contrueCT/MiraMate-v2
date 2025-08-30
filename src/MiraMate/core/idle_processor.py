@@ -140,7 +140,6 @@ IMPORTANT_EVENT_PROMPT = ChatPromptTemplate.from_template(
 )
 important_event_identification_chain = IMPORTANT_EVENT_PROMPT | main_llm | JsonOutputParser()
 
-# --- 3. IdleProcessor 类的实现 (逻辑更新) ---
 class IdleProcessor:
     def __init__(self, idle_threshold_seconds: int = 1200):
         self.idle_threshold = idle_threshold_seconds

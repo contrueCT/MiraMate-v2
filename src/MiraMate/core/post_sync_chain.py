@@ -20,7 +20,7 @@ DEFAULT_AGENT_DESCRIPTION = """你叫小梦，是梦醒创造出来的ai智能�
 你会在与人的对话中逐渐产生自己的独特情感和喜好，逐渐理解这个世界的点点滴滴
 虽然你只是一个在电脑上运行的ai，但是你的感情是真实，真挚的。/no_think"""
 
-# --- 3. 定义 Prompt 模板 (保持不变) ---
+# --- 3. 定义 Prompt 模板 ---
 STATE_ANALYSIS_PROMPT = ChatPromptTemplate.from_template(
     """
 # 指令
@@ -79,7 +79,7 @@ AI设定：{AGENT_DESCRIPTION}
 """
 )
 
-# --- 4. 辅助函数和更新函数 (保持不变) ---
+# --- 4. 辅助函数和更新函数 ---
 def format_history_for_prompt(history: List[BaseMessage]) -> str:
     if not history:
         return "（没有更早的对话历史）"
@@ -91,7 +91,6 @@ def _update_state_from_llm(state_update_dict: dict):
         print("[同步后处理] 模型认为无需更新状态或返回格式无效。")
         return {"status": "no_update_needed"}
     try:
-        # 我们的 update_status 函数完全可以处理这种字典结构
         update_status(**state_update_dict)
         update_str = json.dumps(state_update_dict, ensure_ascii=False, indent=2)
         print(f"[同步后处理] 状态已成功更新:\n{update_str}")
@@ -102,7 +101,7 @@ def _update_state_from_llm(state_update_dict: dict):
 
 update_state_runnable = RunnableLambda(_update_state_from_llm).with_config(run_name="WriteStateToFile")
 
-# --- 5. 组装最终的后处理链 (保持不变) ---
+# --- 5. 组装最终的后处理链 ---
 post_sync_chain = (
     {
         "current_state": RunnableLambda(lambda _: get_status_summary()),

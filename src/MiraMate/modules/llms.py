@@ -3,16 +3,14 @@ import os
 import json
 from typing import Dict, Any
 
-# 导入需要的 LangChain LLM 类
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from sympy import false
 
-# 在文件开头替换现有的路径计算逻辑：
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 🔥 Docker环境适配
+# Docker环境适配
 def get_project_root():
     """获取项目根目录，支持Docker环境"""
     if os.getenv('DOCKER_ENV'):
@@ -50,7 +48,8 @@ def create_llm_from_config(config: Dict[str, Any], is_main_llm: bool = False, **
             model=model_name,
             api_key=api_key,
             base_url=base_url,
-            streaming=is_main_llm, # 只有主模型才默认开启流式
+            # 只有主模型才默认开启流式
+            streaming=is_main_llm, 
             **final_kwargs
         )
     elif api_type == "gemini":
@@ -61,10 +60,6 @@ def create_llm_from_config(config: Dict[str, Any], is_main_llm: bool = False, **
             google_api_key=api_key,
             **final_kwargs
         )
-    # 在这里可以继续添加对其他api类型的支持，比如 'anthropic'
-    # elif api_type == "anthropic":
-    #     from langchain_anthropic import ChatAnthropic
-    #     return ChatAnthropic(model=model_name, api_key=api_key, **final_kwargs)
     
     else:
         raise ValueError(f"不支持的 API 类型: '{api_type}'。目前仅支持 'openai' 和 'gemini'。")

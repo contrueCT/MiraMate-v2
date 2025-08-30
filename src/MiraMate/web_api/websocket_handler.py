@@ -104,7 +104,7 @@ class SimpleWebSocketManager:
         """获取当前连接数"""
         return len(self.active_connections)
 
-
+# TODO：完善主动消息相关功能，加入llm自主活动、回复
 class ProactiveMessageService:
     """主动消息服务"""
     

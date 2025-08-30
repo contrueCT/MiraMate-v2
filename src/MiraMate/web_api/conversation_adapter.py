@@ -26,9 +26,9 @@ class ConversationHandlerAdapter:
         Args:
             config_path: 配置文件路径（保持兼容性，实际不使用）
         """
-        self.session_id = str(uuid.uuid4())  # 为Web API创建一个固定的session
+        self.session_id = str(uuid.uuid4())  
         self.background_tasks_running = False
-        self.idle_processor = None  # 后台任务处理器
+        self.idle_processor = None  
         print(f"✅ ConversationHandlerAdapter 初始化完成，Session ID: {self.session_id}")
         
     async def get_response_with_commands(self, user_message: str, enable_timing: bool = False) -> Dict[str, Any]:

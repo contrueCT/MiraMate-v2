@@ -17,10 +17,6 @@ async def process_conversation_asynchronously(user_input, ai_response, session_i
     AI: {ai_response}
     以JSON格式返回，包含 'facts', 'preferences', 'profile_updates' 三个键，如果没有则返回空列表或空字典。"""
     
-    # 实际应用中会用真实调用，这里我们用模拟数据代替以节省token和时间
-    # extracted_info = await small_model.ainvoke(analysis_prompt)
-    
-    # 模拟提取结果
     extracted_info = {
         "facts": [{"content": f"用户对'{user_input[:10]}'的看法是'{ai_response[:10]}'", "tags": ["对话摘要"]}],
         "preferences": [{"content": f"用户似乎对'{user_input[:10]}'话题感兴趣", "type": "兴趣偏好", "tags": ["新话题"]}]
@@ -54,14 +50,7 @@ def run_idle_maintenance():
         return
         
     print(f"[空闲时维护] 发现 {len(facts_cache)} 条事实缓存，正在处理...")
-    # 2. 调用模型对缓存信息进行整理、去重、合并
-    # summarized_facts = main_llm.invoke(f"请整理这些事实: {facts_cache}")
-    
-    # 3. 将整理后的信息存入 ChromaDB
-    # for fact in summarized_facts:
-    #     memory_system.save_fact_memory(...)
-        
-    # 4. 清空缓存文件
+
     memory_system.clear_fact_cache()
     
     print("[空闲时维护] 缓存已处理并存入长期记忆。")

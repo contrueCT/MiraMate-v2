@@ -121,7 +121,7 @@ def _process_analysis_result(analysis_result: dict) -> dict:
     processed_summary = {}
 
     try:
-        # a. 缓存事实记忆 (修正：传入 confidence)
+        # a. 缓存事实记忆
         facts_to_cache = analysis_result.get("facts_to_cache", [])
         if facts_to_cache:
             for fact in facts_to_cache:
@@ -132,7 +132,7 @@ def _process_analysis_result(analysis_result: dict) -> dict:
                 )
             processed_summary["facts_cached"] = len(facts_to_cache)
 
-        # b. 缓存用户偏好 (修正：传入 confidence)
+        # b. 缓存用户偏好
         preferences_to_cache = analysis_result.get("preferences_to_cache", [])
         if preferences_to_cache:
             for pref in preferences_to_cache:
@@ -144,7 +144,7 @@ def _process_analysis_result(analysis_result: dict) -> dict:
                 )
             processed_summary["preferences_cached"] = len(preferences_to_cache)
 
-        # c. 缓存用户画像更新 (保持不变，接口原本就匹配)
+        # c. 缓存用户画像更新
         profile_updates_to_cache = analysis_result.get("profile_updates_to_cache", [])
         if profile_updates_to_cache:
             # 步骤1: 将LLM返回的列表聚合成一个单一的更新字典
@@ -167,7 +167,7 @@ def _process_analysis_result(analysis_result: dict) -> dict:
                 memory_system.cache_profile_update(profile_dict, source=source_str)
                 processed_summary["profile_updates_cached"] = len(profile_dict)
 
-        # d. 添加临时关注事件 (保持不变，接口原本就匹配)
+        # d. 添加临时关注事件
         temp_events_to_add = analysis_result.get("temp_focus_events_to_add", [])
         if temp_events_to_add:
             for event in temp_events_to_add:

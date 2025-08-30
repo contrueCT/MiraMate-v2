@@ -1,10 +1,7 @@
-# src/MiraMate/modules/TimeTokenMemory.py
-
 import time
 from collections import deque
 from typing import List, Dict, Any
 
-# 导入LangChain的核心组件
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_core.chat_history import BaseChatMessageHistory
 
@@ -13,18 +10,12 @@ from MiraMate.modules.memory_system import format_natural_time
 # 导入tiktoken用于自动计算token
 import tiktoken
 
-# --------------------------------------------------------------------------
-# --- 核心修改：不再继承 BaseMemory，只做纯粹的 ChatHistory ---
-# --------------------------------------------------------------------------
 class CustomTokenMemory(BaseChatMessageHistory):
     """
     一个高性能、自管理的聊天历史记录类，实现了 BaseChatMessageHistory 接口。
-    V5 修改：
-    - 移除对 BaseMemory 的继承，彻底解决 Pydantic 与 @property 的深拷贝冲突。
-    - 作为一个纯粹的 ChatHistory 对象，完美适配 LangChain v0.2+ 的 RunnableWithMessageHistory。
-    - 构造函数 __init__ 改为标准的 Python 形式。
     """
 
+    # TODO 计算token数量的分词器选择需后续优化实现
     def __init__(self, 
                  llm_model_name: str = "gpt-4o",
                  max_token_limit: int = 100000, 
@@ -81,7 +72,7 @@ class CustomTokenMemory(BaseChatMessageHistory):
         self.memory.clear()
         self.total_token_count = 0
 
-    # --- 内部辅助方法 (与之前版本相同，无需修改) ---
+    # --- 内部辅助方法 ---
 
     def _add_message(self, message: BaseMessage, token_count: int) -> None:
         new_item = {

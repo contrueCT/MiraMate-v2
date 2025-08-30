@@ -3,8 +3,6 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List
 
-# 加载状态信息已接入对话链，后续需要在对话完后的步骤中更新各种状态，可以将会话理解模块生成的信息作为更新内容
-
 # 路径配置
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(MODULE_DIR, '..', '..', '..'))
@@ -31,22 +29,22 @@ def load_status() -> Dict[str, Any]:
             "ai_status": {
                 "emotion": {"mood": "平静", "strength": 0.5},
                 "user_attitude": {"emotional_feeling": "中立", "intimacy": 0.5},
-                "relationship_level": 1.0,  # 新增：关系亲密度 1-10
+                "relationship_level": 1.0, 
                 "recent_topic_tags": []
             },
             "user_status": {
                 "last_emotion": "未知",
                 "last_topic": "无",
                 "current_mood": "未知",
-                "energy_level": 0.5  # 新增：用户活跃度
+                "energy_level": 0.5 
             },
             "context_notes": {
                 "thinking_focus": "无",
                 "intent": "无",
-                "conversation_style": "正常",  # 新增：对话风格
-                "session_context": ""  # 新增：会话上下文
+                "conversation_style": "正常",  
+                "session_context": "" 
             },
-            "session_stats": {  # 新增：会话统计
+            "session_stats": {  
                 "message_count": 0,
                 "session_start": get_timestamp(),
                 "last_interaction": get_timestamp()
@@ -253,7 +251,6 @@ def increment_message_count():
     current_count = status.get("session_stats", {}).get("message_count", 0)
     update_status(session_stats={"message_count": current_count + 1})
 
-# 获取当前状态摘要,此处返回的字段与文件存储的不一致，后续需要调整
 def get_status_summary() -> Dict[str, Any]:
     """获取状态系统摘要，用于AI上下文"""
     status = load_status()
@@ -322,61 +319,3 @@ def sync_with_memory_system(memory_system):
                 )
     
     return status_summary
-
-# 示例用法（测试）
-if __name__ == "__main__":
-    print("🧠 状态系统测试开始...")
-    
-    # 测试基本状态更新
-    update_status(ai_status={
-        "emotion": {"mood": "开心", "strength": 0.9},
-        "user_attitude": {"emotional_feeling": "想念", "intimacy": 0.87},
-    })
-    
-    # 测试用户状态更新
-    update_user_status(
-        last_emotion="专注",
-        last_topic="状态系统的设计",
-        current_mood="积极",
-        energy_level=0.8
-    )
-    
-    # 测试上下文注释更新
-    update_context_notes(
-        thinking_focus="是否将上下文保存为状态",
-        intent="进一步完善AI状态系统",
-        conversation_style="技术讨论",
-        session_context="正在开发情感陪伴智能体"
-    )
-    
-    # 测试标签管理
-    add_tag("用户昨天没有说晚安")
-    add_tag("亲密")
-    edit_tag("亲密", "超级亲密")
-    
-    # 测试情绪和关系管理
-    update_ai_emotion("兴奋", 0.95)
-    update_user_attitude("喜欢", 0.1)
-    update_relationship_level(0.3)
-    
-    # 测试会话统计
-    increment_message_count()
-    increment_message_count()
-    
-    # 获取状态摘要
-    summary = get_status_summary()
-    print(f"\n📊 当前关系等级: {summary['relationship_level']:.1f}")
-    print(f"📝 关系描述: {summary['relationship_description']}")
-    
-    # 显示完整状态
-    print("\n✅ 状态更新完成！当前状态如下：")
-    print(json.dumps(load_status(), ensure_ascii=False, indent=2))
-    
-    # 显示关系变化历史
-    history = get_relationship_history(3)
-    if history:
-        print(f"\n📈 最近的关系变化记录:")
-        for record in history:
-            print(f"  {record['readable_time']}: {record['reason']} (变化: {record['change']:.2f})")
-    
-    print("\n🎉 状态系统测试完成！")
