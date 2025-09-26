@@ -3,6 +3,8 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List
 
+# TODO: 目前状态模块存在一些冗余函数以及记录了一些暂时没用到的数据，未来可以考虑精简或在自主决策时用到
+
 # 路径配置
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(MODULE_DIR, '..', '..', '..'))
@@ -273,9 +275,9 @@ def get_status_summary() -> Dict[str, Any]:
     
     return {
         "ai_emotion": status["ai_status"]["emotion"],
-        "attitude_toward_user": status["ai_status"]["user_attitude"], 
+        "attitude_toward_user": status["ai_status"]["attitude_toward_user"], 
         "relationship_level": relationship_level,
-        "relationship_description": relationship_desc,
+        "relationship_description": status["ai_status"]["relationship_description"],
         "user_current": status["user_status"],
         "context": status["context_notes"],
         "session_info": status["session_stats"],

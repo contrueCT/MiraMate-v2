@@ -45,20 +45,23 @@ AI设定：{AGENT_DESCRIPTION}
 # ----------- 输出格式与示例 (这是最重要的部分！) -----------
 你的输出必须是一个JSON对象。对于 'ai_status', 'user_status', 'context_notes' 这三个键，它们的值也必须是JSON对象（字典），而不能是描述性的字符串。
 
-## 示例 1: 如果AI心情变好，用户心情也变好
+## 示例 1: 如果AI心情变好，用户心情也变好，亲密度提升
 {{
     "ai_status": {{
         "emotion": {{"mood": "开心", "strength": 0.8}}
+        "attitude_toward_user": {{"emotional_feeling": "友好", "intimacy": 0.7}}
     }},
     "user_status": {{
         "current_mood": "激动"
-    }}
+    }},
+    "relationship_description": "我与{USER_NAME}的关系正在变得更加亲密和信任。",
 }}
 
 ## 示例 2: 如果只需要更新对话风格
 {{
     "context_notes": {{
-        "conversation_style": "技术讨论"
+        "conversation_style": "技术讨论",
+        "recent_topic_tags": ["编程", "AI", "科技"]
     }}
 }}
 
