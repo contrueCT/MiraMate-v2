@@ -2,13 +2,12 @@
 
 import json
 import os
-import time
 # 在导入任何模型前设置环境变量
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_DATASETS_OFFLINE"] = "1"
 
 import chromadb
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from uuid import uuid4
 from chromadb.utils import embedding_functions
@@ -131,6 +130,33 @@ class MemorySystem:
                 metadata=self.hnsw_metadata_config
             )
         }
+
+    def _parse_iso_datetime(self, dt_str: str) -> Optional[datetime]:
+        """尽可能稳健地解析 ISO 时间戳，返回 UTC 时区的 datetime。
+        兼容示例：
+        - 2025-08-24T00:00:00Z
+        - 2025-08-24T00:00:00.123Z
+        - 2025-08-24T00:00:00+08:00
+        - 2025-08-24 00:00:00  （无时区，按 UTC 处理）
+        """
+        if not isinstance(dt_str, str):
+            return None
+        s = dt_str.strip().replace(' ', 'T')
+        # 兼容以 Z 结尾（UTC）
+        if s.endswith('Z'):
+            s = s[:-1] + '+00:00'
+        try:
+            dt = datetime.fromisoformat(s)
+        except ValueError:
+            return None
+
+        # 统一转为 UTC 有时区时间
+        if dt.tzinfo is None:
+            # 无时区信息时，按 UTC 处理
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt
 
     # === 🧍‍♂️ 用户画像 ===
     # 更新策略，每次对话后都异步保存用户画像，避免阻塞主线程，且在智能体空闲时调用模型处理合并重复字段
@@ -748,19 +774,21 @@ class MemorySystem:
             with open(TEMP_FOCUS_EVENTS_PATH, encoding="utf-8") as f:
                 events = json.load(f)
             
-            # 过滤掉过期事件
-            current_time = datetime.now()
+            # 过滤掉过期事件（统一使用 UTC 比较）
+            now_utc = datetime.now(timezone.utc)
             valid_events = []
             
             for event in events:
-                try:
-                    expire_time = datetime.fromisoformat(event["expire_time"])
-                    if current_time < expire_time:
-                        valid_events.append(event)
-                except:
-                    # 如果时间解析失败，保留事件
+                expire_raw = event.get("expire_time")
+                expire_dt = self._parse_iso_datetime(expire_raw)
+                if expire_dt is None:
+                    # 解析失败则保留，避免误删
                     valid_events.append(event)
-            
+                else:
+                    if now_utc < expire_dt:
+                        valid_events.append(event)
+                    # 否则丢弃（已过期）
+
             # 如果有事件被清理，更新文件
             if len(valid_events) != len(events):
                 with open(TEMP_FOCUS_EVENTS_PATH, "w", encoding="utf-8") as f:
