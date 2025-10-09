@@ -21,7 +21,7 @@ class CustomTokenMemory(BaseChatMessageHistory):
                  max_token_limit: int = 100000, 
                  retention_time: int = 1800, 
                  continuity_threshold: int = 180, 
-                 min_conversation_to_keep: int = 10):
+                 min_conversation_to_keep: int = 40):
         """
         标准的Python构造函数，直接初始化所有属性。
         """

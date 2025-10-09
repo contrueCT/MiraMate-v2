@@ -8,6 +8,8 @@ from MiraMate.modules.memory_system import memory_system
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 
+# TODO：后面要把临时关注事件也加入空闲处理，解决高频发生的临时关注事件无法及时删除的问题。
+
 # --- 1. 创建一个通用的Prompt生成函数以减少重复代码 ---
 def create_consolidation_prompt(task_description: str, data_key: str, output_format: str) -> ChatPromptTemplate:
     """
@@ -65,6 +67,7 @@ preference_prompt = create_consolidation_prompt(
 preference_consolidation_chain = preference_prompt | main_llm | JsonOutputParser()
 
 # c. 画像更新整合链 (这个稍微特殊，输出不是列表)
+# TODO；优化用户画像的处理，减少冗余
 profile_prompt = ChatPromptTemplate.from_template("""# 指令
 你是一个用户画像分析师。你的任务是分析下列用户画像的更新请求，并整合成一个最终的、无冲突的更新字典。
 
@@ -89,7 +92,7 @@ profile_prompt = ChatPromptTemplate.from_template("""# 指令
   "occupation": "软件工程师"
 }}
 
-# 你需要在每次分析用户画像后修改其中的always_remember字段，这个字段在每次ai回答用户时都需要考虑的信息，你根据整体考虑要把哪些信息加入这个字段来确保ai对用户的了解，同时避免重复和冗余,只挑选出所有用户画像中的关键信息，采用键值对的形式，整理成一个字典。
+# 你需要在每次分析用户画像后修改其中的always_remember字段，这个字段在每次ai回答用户时都需要考虑的信息，你根据整体考虑要把哪些信息加入或移除这个字段来确保ai对用户的了解，同时避免重复和冗余,只挑选出所有用户画像中的关键信息，采用键值对的形式，整理成一个字典。
 示例：
 {{
   "always_remember": {{
@@ -220,7 +223,7 @@ class IdleProcessor:
         try:
             print("[IdleProcessor] 正在分析是否存在新的重要事件...")
             # 从数据库和文件中获取所需信息
-            recent_dialogues = memory_system.get_recent_dialogs(limit=5) # 获取最近15条对话作为上下文
+            recent_dialogues = memory_system.get_recent_dialogs(limit=5) # 获取最近10条对话作为上下文
             temp_focus_events = memory_system.get_active_focus_events()
 
             # 仅在有内容可分析时才调用LLM
