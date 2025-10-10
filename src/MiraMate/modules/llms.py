@@ -10,12 +10,19 @@ from sympy import false
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Docker环境适配
 def get_project_root():
-    """获取项目根目录，支持Docker环境"""
-    if os.getenv('DOCKER_ENV'):
-        return '/app'
-    # 开发环境：从 modules/ 向上3级到项目根目录
+    """基于项目结构自动推断项目根目录（包含 pyproject.toml 且有 src/MiraMate）。"""
+    current = MODULE_DIR
+    p = current
+    for _ in range(6):
+        candidate = p
+        if (os.path.exists(os.path.join(candidate, 'pyproject.toml')) and
+                os.path.exists(os.path.join(candidate, 'src', 'MiraMate'))):
+            return candidate
+        parent = os.path.dirname(candidate)
+        if parent == candidate:
+            break
+        p = parent
     return os.path.abspath(os.path.join(MODULE_DIR, '..', '..', '..'))
 
 PROJECT_ROOT = get_project_root()
@@ -31,7 +38,7 @@ def create_llm_from_config(config: Dict[str, Any], is_main_llm: bool = False, **
     """
     api_type = config.get("api_type")
     model_name = config.get("model")
-    api_key = config.get("api_key") or os.getenv("API_KEY") # 优先使用配置中的key，否则尝试环境变量
+    api_key = config.get("api_key")  # API Key 仅来源于配置文件，移除环境变量兜底
     base_url = config.get("base_url")
 
     if not all([api_type, model_name, api_key]):

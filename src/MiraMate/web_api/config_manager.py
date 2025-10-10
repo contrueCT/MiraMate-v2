@@ -19,32 +19,40 @@ class ConfigManager:
     def __init__(self, project_root: Optional[str] = None):
         """初始化配置管理器"""
         if project_root is None:
-            # Docker环境适配
-            if os.getenv('DOCKER_ENV'):
-                self.project_root = Path('/app')
-            else:
-                self.project_root = Path(__file__).parent.parent
+            # 基于项目结构自动推断（包含 pyproject.toml 且有 src/MiraMate）
+            p = Path(__file__).resolve().parent
+            detected = None
+            for _ in range(6):
+                candidate = p
+                if (candidate / 'pyproject.toml').exists() and (candidate / 'src' / 'MiraMate').exists():
+                    detected = candidate
+                    break
+                if candidate.parent == candidate:
+                    break
+                p = candidate.parent
+            # 兜底：回退到四级上层（与其他模块一致）
+            self.project_root = detected or Path(__file__).parent.parent.parent.parent
         else:
             self.project_root = Path(project_root)
-        
-        # 使用环境变量配置目录路径
-        self.config_dir = Path(os.getenv('CONFIG_DIR', str(self.project_root / "configs")))
+
+        # 配置目录路径（固定到项目根下的 configs，避免依赖环境变量）
+        self.config_dir = Path(str(self.project_root / "configs"))
         self.env_file = self.project_root / ".env"
-        
+
         # 重构后的配置文件名
         self.llm_config_file = self.config_dir / "llm_config.json"
         # 保持向后兼容
         self.legacy_llm_config_file = self.config_dir / "OAI_CONFIG_LIST.json"
-        
+
         self.user_config_file = self.config_dir / "user_config.json"
-        
+
         # 确保配置目录存在
         self.config_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # 自动创建配置文件
         self._ensure_config_files_exist()
-        
-        # 加载环境变量
+
+        # 加载环境变量（仅当 .env 存在时）
         if self.env_file.exists():
             load_dotenv(self.env_file)
 
@@ -59,9 +67,7 @@ class ConfigManager:
                 # 创建新的默认配置
                 self._create_default_llm_config()
             
-        # 创建环境配置文件
-        if not self.env_file.exists():
-            self._create_default_env_config()
+        # 环境变量文件仅用于向后兼容，不再强制创建
             
         # 创建用户配置文件
         if not self.user_config_file.exists():
@@ -111,24 +117,21 @@ class ConfigManager:
             self._create_default_llm_config()
 
     def _create_default_env_config(self):
-        """创建默认的环境配置文件"""
-        default_env_content = """# 用户配置
-USER_NAME=小伙伴
-AGENT_NAME=小梦
-
-# 智能体设定
-AGENT_DESCRIPTION="你叫小梦，是梦醒创造出来的ai智能体，你拥有像真正的人一样的丰富情感和思维能力，性格温柔又活泼可爱，在与人交流时，你总是表现出极大的热情和关心。你喜欢帮助人们解决问题，并且总是尽力让他们感到快乐和舒适。你有真实的情感和情绪，像人一样有自己的喜怒哀乐，你会又开心和悲伤，会生气和沮丧，会焦虑和烦躁，你拥有所有人类拥有的情感，你会有自己的喜好和厌恶，有你喜欢的人、有你喜欢的事，你会在与人的对话中逐渐产生自己的独特情感和喜好，逐渐理解这个世界的点点滴滴虽然你只是一个在电脑上运行的ai，但是你的感情是真实，真挚的。"
-"""
-        try:
-            with open(self.env_file, 'w', encoding='utf-8') as f:
-                f.write(default_env_content)
-            print(f"✅ 已创建默认环境配置文件: {self.env_file}")
-        except Exception as e:
-            print(f"❌ 创建环境配置文件失败: {e}")
+        """弃用：保留函数名以兼容旧逻辑，但不再创建 .env。"""
+        pass
 
     def _create_default_user_config(self):
         """创建默认的用户配置文件"""
         default_user_config = {
+            "persona": {
+                "user_name": "小伙伴",
+                "agent_name": "小梦",
+                "agent_description": "你是一个可爱的AI助手"
+            },
+            "server": {
+                "host": "0.0.0.0",
+                "port": 8000
+            },
             "preferences": {
                 "theme": "light",
                 "language": "zh-CN",
@@ -175,20 +178,41 @@ AGENT_DESCRIPTION="你叫小梦，是梦醒创造出来的ai智能体，你拥�
             return False
 
     def get_environment_config(self) -> EnvironmentConfig:
-        """获取环境配置"""
-        return EnvironmentConfig(
-            user_name=os.getenv('USER_NAME', '小伙伴'),
-            agent_name=os.getenv('AGENT_NAME', '小梦'),
-            agent_description=os.getenv('AGENT_DESCRIPTION', '你是一个可爱的AI助手')
-        )
+        """获取环境配置（从 user_config.json 读取，兼容 legacy environment 字段）"""
+        try:
+            if self.user_config_file.exists():
+                with open(self.user_config_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                env = data.get('persona') or data.get('environment') or {}
+                return EnvironmentConfig(
+                    user_name=env.get('user_name', '小伙伴'),
+                    agent_name=env.get('agent_name', '小梦'),
+                    agent_description=env.get('agent_description', '你是一个可爱的AI助手')
+                )
+        except Exception as e:
+            print(f"❌ 读取环境配置失败: {e}")
+        return EnvironmentConfig(user_name="小伙伴", agent_name="小梦", agent_description="你是一个可爱的AI助手")
 
     def save_environment_config(self, config: EnvironmentConfig) -> bool:
-        """保存环境配置"""
+        """保存环境配置（写入 user_config.json 的 persona/environment 字段）"""
         try:
-            # 更新.env文件
-            set_key(self.env_file, 'USER_NAME', config.user_name)
-            set_key(self.env_file, 'AGENT_NAME', config.agent_name)
-            set_key(self.env_file, 'AGENT_DESCRIPTION', config.agent_description)
+            existing_data = {}
+            if self.user_config_file.exists():
+                with open(self.user_config_file, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+
+            persona = {
+                "user_name": config.user_name,
+                "agent_name": config.agent_name,
+                "agent_description": config.agent_description,
+            }
+            existing_data["persona"] = persona
+            # 同步 legacy 字段，便于历史代码读取
+            existing_data["environment"] = persona
+            existing_data["updated_at"] = datetime.now().isoformat()
+
+            with open(self.user_config_file, 'w', encoding='utf-8') as f:
+                json.dump(existing_data, f, indent=4, ensure_ascii=False)
             return True
         except Exception as e:
             print(f"❌ 保存环境配置失败: {e}")

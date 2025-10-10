@@ -11,6 +11,7 @@ from langchain_core.output_parsers import JsonOutputParser
 # 导入我们需要的模块
 from MiraMate.modules.llms import small_llm
 from MiraMate.modules.memory_system import memory_system
+from MiraMate.modules.settings import get_persona
 
 # --- 1. 定义 Prompt 模板 ---
 ASYNC_ANALYSIS_PROMPT = ChatPromptTemplate.from_template(
@@ -220,8 +221,8 @@ post_async_chain = (
         "ai_response": lambda x: x["ai_response"],
         "current_date": lambda x: datetime.now().strftime("%Y-%m-%d"),
         "_original_input": lambda x: x,
-        "USER_NAME": lambda x: os.getenv("USER_NAME", "小伙伴"),
-        "AGENT_NAME": lambda x: os.getenv("AGENT_NAME", "小梦")
+        "USER_NAME": lambda x: get_persona().get("USER_NAME", "小伙伴"),
+        "AGENT_NAME": lambda x: get_persona().get("AGENT_NAME", "小梦")
     }
     # 接收上面准备好的字典，运行 analysis_parser_chain，
     # 然后将结果以 "analysis_json" 为键，添加到原始字典中。

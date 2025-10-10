@@ -15,14 +15,21 @@ from contextlib import asynccontextmanager
 
 # 添加项目根目录到Python路径
 def get_project_root():
-    """获取项目根目录，支持容器环境"""
-    if os.getenv('DOCKER_ENV'):
-        return '/app'
-    # 从当前文件位置向上追溯到项目根目录
-    # 当前文件: src/MiraMate/web_api/web_api.py  
-    # 项目根目录: 向上3级
-    current_file = os.path.abspath(__file__)
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
+    """基于项目结构自动推断项目根目录（包含 pyproject.toml 且有 src/MiraMate）。"""
+    current = os.path.abspath(__file__)
+    p = os.path.dirname(current)
+    # 往上查找带 pyproject.toml 且包含 src/MiraMate 的目录
+    for _ in range(6):
+        candidate = p
+        if (os.path.exists(os.path.join(candidate, 'pyproject.toml')) and
+                os.path.exists(os.path.join(candidate, 'src', 'MiraMate'))):
+            return candidate
+        parent = os.path.dirname(candidate)
+        if parent == candidate:
+            break
+        p = parent
+    # 兜底：返回四级上层（与原注释等价）
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current))))
 
 project_root = get_project_root()
 sys.path.insert(0, project_root)
@@ -937,9 +944,15 @@ async def update_environment_config(config: EnvironmentConfig):
         success = server.config_manager.save_environment_config(config)
         
         if success:
+            # 保存成功后，立即尝试重新初始化系统，使配置即时生效
+            try:
+                await server.initialize()
+                init_msg = "系统已重新初始化"
+            except Exception as e:
+                init_msg = f"重新初始化失败: {e}"
             return ConfigResponse(
                 success=True,
-                message="环境配置更新成功",
+                message=f"环境配置更新成功，{init_msg}",
                 config=config.dict()
             )
         else:

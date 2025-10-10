@@ -42,25 +42,25 @@ def format_natural_time(dt: datetime) -> str:
 
 # === 📦 二、存储目录设置 - Docker环境适配 ===
 def get_project_root():
-    """获取项目根目录，支持Docker环境"""
-    if os.getenv('DOCKER_ENV'):
-        return '/app'
-    # 开发环境：从 modules/ 向上3级到项目根目录
-    # 当前文件: src/MiraMate/modules/memory_system.py
-    # 项目根目录: 向上3级
+    """基于项目结构自动推断项目根目录（包含 pyproject.toml 且有 src/MiraMate）。"""
+    current = os.path.abspath(__file__)
+    p = os.path.dirname(current)
+    for _ in range(6):
+        candidate = p
+        if (os.path.exists(os.path.join(candidate, 'pyproject.toml')) and
+                os.path.exists(os.path.join(candidate, 'src', 'MiraMate'))):
+            return candidate
+        parent = os.path.dirname(candidate)
+        if parent == candidate:
+            break
+        p = parent
     MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
     return os.path.abspath(os.path.join(MODULE_DIR, '..', '..', '..'))
 
 PROJECT_ROOT = get_project_root()
 
-# Docker环境适配的存储路径
-if os.getenv('DOCKER_ENV'):
-    # Docker环境：使用环境变量指定的内存数据库目录
-    MEMORY_DB_DIR = os.getenv('MEMORY_DB_DIR', '/app/memory_db')
-    BASE_DIR = os.path.join(MEMORY_DB_DIR, "memory_storage")
-else:
-    # 开发环境：使用相对路径
-    BASE_DIR = os.path.join(PROJECT_ROOT, "memory", "memory_storage")
+# 统一的存储路径（容器和本地一致，容器中通过卷挂载保证持久化）
+BASE_DIR = os.path.join(PROJECT_ROOT, "memory", "memory_storage")
 
 PROFILE_PATH = os.path.join(BASE_DIR, "user_profile.json")
 ACTIVE_TAGS_PATH = os.path.join(BASE_DIR, "active_tags.json")

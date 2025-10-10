@@ -6,71 +6,94 @@ import sys
 from pathlib import Path
 
 
-import subprocess
 import shutil
+import importlib
+from MiraMate.modules.settings import get_server
 
 # Docker环境适配
 def get_project_root():
-    """获取项目根目录，支持容器环境"""
-    if os.getenv('DOCKER_ENV'):
-        return Path('/app')
-    # 从当前文件位置向上追溯到项目根目录
-    # 当前文件: src/MiraMate/web_api/start_web_api.py
-    # 项目根目录: 向上3级
+    """基于项目结构自动推断项目根目录（包含 pyproject.toml 且有 src/MiraMate）。"""
+    p = Path(__file__).resolve().parent
+    for _ in range(6):
+        candidate = p
+        if (candidate / 'pyproject.toml').exists() and (candidate / 'src' / 'MiraMate').exists():
+            return candidate
+        if candidate.parent == candidate:
+            break
+        p = candidate.parent
     return Path(__file__).parent.parent.parent.parent
 
 project_root = get_project_root()
 sys.path.insert(0, str(project_root))
 
 def check_dependencies():
-    """检查并安装依赖"""
-    # Docker环境中跳过依赖检查
+    """轻量依赖检查：通过导入探测所需模块，提供安装指引，不在运行时安装。"""
+    # Docker 环境中跳过依赖检查（镜像构建阶段已安装）
     if os.getenv('DOCKER_ENV'):
-        print("📦 Docker环境，跳过依赖检查...")
+        print("📦 Docker环境，跳过依赖检查…")
         return True
-        
-    requirements_file = project_root / "src" / "MiraMate" / "web_api" / "requirements-web.txt"
-    
-    print("📦 检查Web API依赖...")
-    
-    # 检查是否在虚拟环境中（通过VIRTUAL_ENV环境变量）
+
+    print("📦 检查 Web API 运行依赖…")
+
+    core_modules = [
+        ("fastapi", None),
+        ("uvicorn", None),
+    ]
+    optional_modules = [
+        ("langchain_openai", None),
+        ("langchain_google_genai", None),
+        ("chromadb", None),
+        ("sentence_transformers", None),
+    ]
+
+    missing_core = []
+    missing_optional = []
+
+    def _try_import(mod: str) -> bool:
+        try:
+            importlib.import_module(mod)
+            return True
+        except Exception:
+            return False
+
+    for mod, _ in core_modules:
+        if not _try_import(mod):
+            missing_core.append(mod)
+    for mod, _ in optional_modules:
+        if not _try_import(mod):
+            missing_optional.append(mod)
+
+    # 安装建议
+    has_uv = shutil.which('uv') is not None
+    pip_cmd = f"{sys.executable} -m pip install -e ."
+    uv_cmd = "uv pip install -e ."
+
+    # 提示虚拟环境
     venv_path = os.getenv('VIRTUAL_ENV')
-    is_in_venv = venv_path is not None
-    
-    if is_in_venv:
+    if venv_path:
         print(f"✅ 检测到虚拟环境: {venv_path}")
     else:
-        print("⚠️  未检测到激活的虚拟环境")
-    
-    try:
-        # 优先使用 uv，如果不可用则回退到 pip
-        if shutil.which('uv'):
-            print("✅ 使用 uv 安装依赖...")
-            if requirements_file.exists():
-                subprocess.run(['uv', 'pip', 'install', '-r', str(requirements_file)], check=True)
-            else:
-                print(f"⚠️  requirements文件不存在: {requirements_file}")
-                print("💡 跳过依赖安装，假设依赖已经安装")
-        elif shutil.which('pip'):
-            print("✅ 使用 pip 安装依赖...")
-            if requirements_file.exists():
-                subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(requirements_file)], check=True)
-            else:
-                print(f"⚠️  requirements文件不存在: {requirements_file}")
-                print("💡 跳过依赖安装，假设依赖已经安装")
+        print("⚠️ 未检测到已激活的虚拟环境（建议先创建并激活虚拟环境再安装依赖）")
+
+    if missing_core:
+        print(f"❌ 缺少核心依赖: {', '.join(missing_core)}")
+        print("➡️  请先安装项目依赖（基于 pyproject.toml）：")
+        if has_uv:
+            print(f"   - {uv_cmd}")
         else:
-            print("⚠️  未找到 uv 或 pip，跳过依赖检查")
-            print("💡 请确保所需的依赖已经手动安装")
-            
-        print("✅ 依赖检查完成")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ 依赖安装失败: {e}")
-        print("💡 请手动检查并安装依赖")
+            print(f"   - {pip_cmd}")
+        print("💡 Windows PowerShell 请先激活虚拟环境后再执行以上命令。")
         return False
-    except Exception as e:
-        print(f"❌ 检查依赖时发生错误: {e}")
-        return False
-    
+
+    if missing_optional:
+        print(f"⚠️ 缺少可选依赖（部分功能可能受限）: {', '.join(missing_optional)}")
+        print("➡️  安装项目依赖可一并解决：")
+        if has_uv:
+            print(f"   - {uv_cmd}")
+        else:
+            print(f"   - {pip_cmd}")
+
+    print("✅ 依赖检查完成")
     return True
 
 def check_config():
@@ -128,8 +151,9 @@ def start_server():
         from MiraMate.web_api.web_api import app
         
         # 从环境变量获取配置
-        host = os.getenv('HOST', '0.0.0.0')  # Docker中使用0.0.0.0
-        port = int(os.getenv('PORT', '8000'))
+        srv = get_server()
+        host = srv.get('HOST', '0.0.0.0')
+        port = int(srv.get('PORT', 8000))
         
         print(f"\n🚀 启动情感陪伴AI Web API服务器...")
         print("=" * 50)
@@ -160,9 +184,7 @@ def main():
     print("🎯 情感陪伴AI Web API 启动器")
     print("=" * 40)
     
-    # Docker环境检查
-    if os.getenv('DOCKER_ENV'):
-        print("🐳 Docker环境检测到")
+    # 环境信息提示（可选）
     
     # 检查依赖
     if not check_dependencies():

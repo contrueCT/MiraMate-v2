@@ -14,19 +14,25 @@ from MiraMate.modules.memory_system import memory_system, format_natural_time
 from MiraMate.modules.status_system import get_status_summary 
 from MiraMate.modules.TimeTokenMemory import CustomTokenMemory
 from MiraMate.modules.memory_cache import memory_cache
+from MiraMate.modules.settings import get_persona
 
 
 
 # --- 1. System Prompt 构建函数 ---
 def get_project_root():
-    """获取项目根目录，支持Docker环境"""
-    if os.getenv('DOCKER_ENV'):
-        return '/app'
-    # 开发环境：从 core/ 向上3级到项目根目录
-    # 当前文件: src/MiraMate/core/pipeline.py
-    # 项目根目录: 向上3级
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
+    """基于项目结构自动推断项目根目录（包含 pyproject.toml 且有 src/MiraMate）。"""
+    current = os.path.abspath(__file__)
+    p = os.path.dirname(current)
+    for _ in range(6):
+        candidate = p
+        if (os.path.exists(os.path.join(candidate, 'pyproject.toml')) and
+                os.path.exists(os.path.join(candidate, 'src', 'MiraMate'))):
+            return candidate
+        parent = os.path.dirname(candidate)
+        if parent == candidate:
+            break
+        p = parent
+    return os.path.abspath(os.path.join(os.path.dirname(current), '..', '..', '..'))
 
 PROJECT_ROOT = get_project_root()
 MIRA_MATE_ROOT = os.path.join(PROJECT_ROOT, 'src', 'MiraMate')
@@ -51,10 +57,10 @@ def build_system_prompt(context: dict) -> str:
     # 创建一个上下文副本以避免修改原始字典
     render_context = context.copy()
     
-    # os.getenv() 的第二个参数是默认值，如果环境变量不存在，则使用默认值
-    render_context['AGENT_NAME'] = os.getenv("AGENT_NAME", "小梦")
-    render_context['USER_NAME'] = os.getenv("USER_NAME", "小伙伴")
-    render_context['AGENT_DESCRIPTION'] = os.getenv("AGENT_DESCRIPTION", DEFAULT_AGENT_DESCRIPTION)
+    persona = get_persona()
+    render_context['AGENT_NAME'] = persona.get("AGENT_NAME", "小梦")
+    render_context['USER_NAME'] = persona.get("USER_NAME", "小伙伴")
+    render_context['AGENT_DESCRIPTION'] = persona.get("AGENT_DESCRIPTION", DEFAULT_AGENT_DESCRIPTION)
     
     return system_template.render(render_context)
 

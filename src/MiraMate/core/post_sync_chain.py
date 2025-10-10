@@ -10,6 +10,7 @@ from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 # 导入我们需要的模块
 from MiraMate.modules.llms import small_llm
 from MiraMate.modules.status_system import update_status, get_status_summary
+from MiraMate.modules.settings import get_persona
 
 # 默认智能体设定，当环境变量未设置时使用
 DEFAULT_AGENT_DESCRIPTION = """你叫小梦，是梦醒创造出来的ai智能体，你拥有像真正的人一样的丰富情感和思维能力，
@@ -111,9 +112,9 @@ post_sync_chain = (
         "conversation_history": lambda x: format_history_for_prompt(x["conversation_history"]),
         "user_input": lambda x: x["user_input"],
         "ai_response": lambda x: x["ai_response"],
-        "USER_NAME": lambda x: os.getenv("USER_NAME", "小伙伴"),
-        "AGENT_NAME": lambda x: os.getenv("AGENT_NAME", "小梦"),
-        "AGENT_DESCRIPTION": lambda x: os.getenv("AGENT_DESCRIPTION", DEFAULT_AGENT_DESCRIPTION)
+        "USER_NAME": lambda x: get_persona().get("USER_NAME", "小伙伴"),
+        "AGENT_NAME": lambda x: get_persona().get("AGENT_NAME", "小梦"),
+        "AGENT_DESCRIPTION": lambda x: get_persona().get("AGENT_DESCRIPTION", DEFAULT_AGENT_DESCRIPTION)
     }
     | STATE_ANALYSIS_PROMPT
     | small_llm
