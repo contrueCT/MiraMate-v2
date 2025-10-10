@@ -1,0 +1,85 @@
+# 与 .gitignore 对齐，避免将无关文件打包进镜像
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 环境变量
+.env
+.venv
+env/
+venv/
+ENV/
+
+# 记忆数据（在运行时使用外部卷挂载）
+memory/
+
+# 本地对话日志
+logs/
+
+# 配置文件（在运行时使用外部卷挂载）
+configs/llm_config.json
+configs/backup_20250615_173124
+configs/user_config.json
+configs/backup_20250615_173124/OAI_CONFIG_LIST.json
+
+# Git 与 GitHub
+.git/
+.github/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 操作系统
+.DS_Store
+Thumbs.db
+dev-note/
+
+# 测试
+test_memory_db/
+test_db/
+tests/
+
+# 客户端静态库与临时文件
+mira-desktop/node_modules/
+BUTTON_VISIBILITY_FIX.md
+VISUAL_EFFECTS_IMPROVEMENT.md
+start_theme_test.py
+CHAT_HEADER_THEME_IMPROVEMENT.md
+mira-desktop/web/theme-test.html
+CONFIG_MANAGEMENT_GUIDE.md
+miramate-backend-1.0.0.tar
+miramate-backend-1.0.0.zip
+WEBSOCKET_BACKEND_COMPLETE.md
+WEBSOCKET_IMPLEMENTATION_PLAN.md
+test_websocket_backend.py
+
+# 其他
+__pycache__/
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo

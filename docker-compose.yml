@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  miramate-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: miramate-api:latest
+    container_name: miramate-api
+    environment:
+      - DOCKER_ENV=1
+      - HOST=0.0.0.0
+      - PORT=8000
+      # 可选：覆盖配置目录（默认为 /app/configs）
+      # - CONFIG_DIR=/app/configs
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./configs:/app/configs
+      - ./memory:/app/memory
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
