@@ -80,9 +80,10 @@ class WebAPIServer:
                 print(f"💡 可通过Web界面配置API密钥后重启服务")
                 self.conversation_handler = None
             
-            # 启动WebSocket主动消息服务
-            await start_proactive_service()
-            print(f"✅ WebSocket主动消息服务启动成功")
+            # TODO: 主动消息功能未完成，暂时禁用
+            # # 启动WebSocket主动消息服务
+            # await start_proactive_service()
+            # print(f"✅ WebSocket主动消息服务启动成功")
             
         except Exception as e:
             print(f"⚠️  服务初始化失败: {e}")

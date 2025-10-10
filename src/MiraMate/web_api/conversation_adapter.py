@@ -110,6 +110,7 @@ class ConversationHandlerAdapter:
     async def get_response_stream(self, user_message: str, enable_timing: bool = False):
         """
         获取AI回复流式输出（新增流式接口）
+        目前主要的输出方法
         
         Args:
             user_message: 用户消息
@@ -226,14 +227,12 @@ class ConversationHandlerAdapter:
             status_summary = get_status_summary()
             
             # 解析状态信息，提取情感相关数据
-            ai_status = status_summary.get("ai_status", {})
-            emotion_info = ai_status.get("emotion", {})
+            ai_status = status_summary.get("ai_emotion", {})
             
             # 转换为API期望的格式
             return {
-                "current_emotion": emotion_info.get("mood", "neutral"),
-                "emotion_intensity": float(emotion_info.get("strength", 0.5)),
-                "relationship_level": ai_status.get("relationship_level", 5)
+                "current_emotion": ai_status.get("mood", "neutral"),
+                "emotion_intensity": float(ai_status.get("strength", 0.5))
             }
             
         except Exception as e:
@@ -241,8 +240,7 @@ class ConversationHandlerAdapter:
             # 返回默认状态
             return {
                 "current_emotion": "neutral",
-                "emotion_intensity": 0.5,
-                "relationship_level": 5
+                "emotion_intensity": 0.5
             }
     
     def start_background_tasks(self):
