@@ -131,6 +131,91 @@ class MemorySystem:
             )
         }
 
+    # --- 内部：安全查询 + 索引自修复 ---
+    def _safe_query(self, collection_key: str, search_params: Dict):
+        """
+        对 Chroma 集合执行查询，若检测到 HNSW 段索引丢失/损坏，则自动重建并重试一次。
+        不改变原有查询行为，只有在特定错误出现时才介入自修复。
+        """
+        try:
+            return self.collections[collection_key].query(**search_params)
+        except Exception as e:
+            msg = str(e).lower()
+            # 常见报错："error creating hnsw segment reader: Nothing found on disk"
+            if ("hnsw" in msg) and ("segment" in msg or "nothing found on disk" in msg):
+                print(f"\u26a0\ufe0f 检测到集合 '{collection_key}' 的 HNSW 索引缺失/损坏，正在尝试自动重建...")
+                self._rebuild_collection_index(collection_key)
+                # 重试一次
+                return self.collections[collection_key].query(**search_params)
+            # 其它异常按原样抛出
+            raise
+
+    def _rebuild_collection_index(self, collection_key: str, batch_size: int = 512):
+        """
+        重建指定集合的 HNSW 索引：
+        1) 读取当前集合的数据（ids/documents/metadatas/embeddings-若可用）
+        2) 删除集合并按原配置重建
+        3) 分批写回数据，触发索引重建（若 embeddings 可用则直接写入以避免重新计算）
+        """
+        try:
+            coll = self.collections.get(collection_key)
+            if coll is None:
+                print(f"❌ 重建失败：集合 '{collection_key}' 不存在")
+                return
+
+            # 读取数据，优先包含 embeddings；若不支持则降级
+            data = None
+            try:
+                data = coll.get(include=["ids", "documents", "metadatas", "embeddings"])
+            except Exception:
+                data = coll.get(include=["ids", "documents", "metadatas"])  # 某些存储后端可能不支持 embeddings 导出
+
+            ids = data.get("ids", []) or []
+            docs = data.get("documents", []) or []
+            metas = data.get("metadatas", []) or []
+            embeds = data.get("embeddings") if isinstance(data, dict) else None
+
+            total = len(ids)
+            print(f"[MemorySystem] 备份集合 '{collection_key}' 中的 {total} 条记录用于重建")
+
+            # 删除并重建集合
+            self.client.delete_collection(name=collection_key)
+            new_coll = self.client.get_or_create_collection(
+                name=collection_key,
+                embedding_function=self.embedding_function,
+                metadata=self.hnsw_metadata_config
+            )
+            self.collections[collection_key] = new_coll
+
+            # 若原集合为空，直接返回
+            if total == 0:
+                print(f"[MemorySystem] 集合 '{collection_key}' 为空，已完成空索引重建")
+                return
+
+            # 分批写回
+            has_embeds = isinstance(embeds, list) and len(embeds) == total
+            for i in range(0, total, batch_size):
+                batch_ids = ids[i:i+batch_size]
+                batch_docs = docs[i:i+batch_size]
+                batch_metas = metas[i:i+batch_size]
+                if has_embeds:
+                    batch_embeds = embeds[i:i+batch_size]
+                    new_coll.add(
+                        ids=batch_ids,
+                        documents=batch_docs,
+                        metadatas=batch_metas,
+                        embeddings=batch_embeds
+                    )
+                else:
+                    new_coll.add(
+                        ids=batch_ids,
+                        documents=batch_docs,
+                        metadatas=batch_metas
+                    )
+            print(f"✅ 集合 '{collection_key}' 的 HNSW 索引重建完成，共写回 {total} 条记录")
+        except Exception as e:
+            print(f"❌ 重建集合 '{collection_key}' 索引失败: {e}")
+
     def _parse_iso_datetime(self, dt_str: str) -> Optional[datetime]:
         """尽可能稳健地解析 ISO 时间戳，返回 UTC 时区的 datetime。
         兼容示例：
@@ -235,7 +320,8 @@ class MemorySystem:
             if where_filter:
                 search_params["where"] = where_filter
             
-            results = self.collections["dialog_logs"].query(**search_params)
+            # 使用安全查询，必要时自动重建索引
+            results = self._safe_query("dialog_logs", search_params)
             
             dialog_memories = []
             if (results and results["documents"] and results["documents"][0] and
@@ -352,7 +438,8 @@ class MemorySystem:
             if where_filter:
                 search_params["where"] = where_filter
             
-            results = self.collections["facts"].query(**search_params)
+            # 使用安全查询，必要时自动重建索引
+            results = self._safe_query("facts", search_params)
             
             fact_memories = []
             if (results and results["documents"] and results["documents"][0] and
@@ -598,7 +685,8 @@ class MemorySystem:
             if where_filter:
                 search_params["where"] = where_filter
             
-            results = self.collections["user_preferences"].query(**search_params)
+            # 使用安全查询，必要时自动重建索引
+            results = self._safe_query("user_preferences", search_params)
             
             preference_memories = []
             if (results and results["documents"] and results["documents"][0] and
@@ -689,7 +777,8 @@ class MemorySystem:
             if where_filter:
                 search_params["where"] = where_filter
             
-            results = self.collections["important_events"].query(**search_params)
+            # 使用安全查询，必要时自动重建索引
+            results = self._safe_query("important_events", search_params)
             
             event_memories = []
             if (results and results["documents"] and results["documents"][0] and
