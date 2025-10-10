@@ -160,6 +160,35 @@ IMPORTANT_EVENT_PROMPT = ChatPromptTemplate.from_template(
 )
 important_event_identification_chain = IMPORTANT_EVENT_PROMPT | main_llm | JsonOutputParser()
 
+# --- e. 临时关注事件清理链（根据最近对话识别哪些已结束/不再需要关注，基于ID删除） ---
+TEMP_FOCUS_CLEAN_PROMPT = ChatPromptTemplate.from_template(
+        """# 指令
+你是一位负责维护“临时关注事件”的助理。请根据“最近的对话记录”，判断以下临时关注事件是否已经完成、取消、或被明确表示不再需要关注。
+
+# 判定标准
+- 若在对话中出现了事件已经完成/结束/取消的明确表达，则应删除。
+- 若在对话中明确表示不再需要关注、已达成目的、已解决，也应删除。
+- 不要猜测；没有确凿证据时不要删除。
+
+# 输入
+## 最近的对话记录
+{recent_dialogues}
+
+## 当前的临时关注事件（每个事件都包含 id 和 content）
+{temp_focus_events}
+
+# 输出格式（严格JSON）：
+返回一个仅包含一个键 "to_delete_ids" 的JSON对象，其中 "to_delete_ids" 是一个字符串数组，包含需要删除的事件的 id。若无需删除请返回空数组。
+例如：
+{{
+    "to_delete_ids": ["temp_abc123", "temp_def456"]
+}}
+
+请直接输出JSON：
+"""
+)
+temp_focus_clean_chain = TEMP_FOCUS_CLEAN_PROMPT | main_llm | JsonOutputParser()
+
 class IdleProcessor:
     def __init__(self, idle_threshold_seconds: int = 1200):
         self.idle_threshold = idle_threshold_seconds
@@ -244,6 +273,26 @@ class IdleProcessor:
                 print("[IdleProcessor] 无可供分析的对话或关注事件，跳过重要事件识别。")
         except Exception as e:
             print(f"[IdleProcessor] ❌ 重要事件识别失败: {e}")
+
+        # --- e. 清理已完成/不再需要的临时关注事件 ---
+        try:
+            # 仅在存在关注事件时尝试清理
+            existing_temp_events = memory_system.get_active_focus_events()
+            if existing_temp_events:
+                print("[IdleProcessor] 正在判定需要删除的临时关注事件...")
+                recent_dialogues = memory_system.get_recent_dialogs(limit=5)
+                result = temp_focus_clean_chain.invoke({
+                    "recent_dialogues": json.dumps(recent_dialogues, ensure_ascii=False, indent=2),
+                    "temp_focus_events": json.dumps(existing_temp_events, ensure_ascii=False, indent=2)
+                })
+                to_delete_ids = result.get("to_delete_ids", []) or []
+                if to_delete_ids:
+                    removed = memory_system.delete_temp_focus_events_by_ids(to_delete_ids)
+                    print(f"[IdleProcessor] ✅ 已删除 {removed} 条临时关注事件。")
+                else:
+                    print("[IdleProcessor] 未发现需要删除的临时关注事件。")
+        except Exception as e:
+            print(f"[IdleProcessor] ❌ 清理临时关注事件失败: {e}")
 
         print("[IdleProcessor] 所有缓存处理流程结束。")
 

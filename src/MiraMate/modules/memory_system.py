@@ -827,6 +827,7 @@ class MemorySystem:
                              expire_time: str, tags: List[str]):
         """保存近期关注事件"""
         temp_event = {
+            "id": f"temp_{uuid4().hex}",
             "created_at": get_iso_timestamp(),
             "event_time": event_time,
             "expire_time": expire_time,
@@ -862,6 +863,15 @@ class MemorySystem:
         try:
             with open(TEMP_FOCUS_EVENTS_PATH, encoding="utf-8") as f:
                 events = json.load(f)
+            # 兼容历史数据：为缺少 id 的事件补齐并落盘
+            updated_for_ids = False
+            for e in events:
+                if "id" not in e or not e.get("id"):
+                    e["id"] = f"temp_{uuid4().hex}"
+                    updated_for_ids = True
+            if updated_for_ids:
+                with open(TEMP_FOCUS_EVENTS_PATH, "w", encoding="utf-8") as f:
+                    json.dump(events, f, ensure_ascii=False, indent=2)
             
             # 过滤掉过期事件（统一使用 UTC 比较）
             now_utc = datetime.now(timezone.utc)
@@ -917,6 +927,26 @@ class MemorySystem:
         # 根据过期机制自动清理
         valid_events = self.load_temp_focus_events()
         return len(valid_events)
+
+    def delete_temp_focus_events_by_ids(self, ids: List[str]) -> int:
+        """按 ID 删除临时关注事件，返回删除数量。"""
+        if not ids:
+            return 0
+        try:
+            events = self.load_temp_focus_events()
+            before = len(events)
+            id_set = set(ids)
+            remaining = [e for e in events if e.get("id") not in id_set]
+            if len(remaining) != before:
+                with open(TEMP_FOCUS_EVENTS_PATH, "w", encoding="utf-8") as f:
+                    json.dump(remaining, f, ensure_ascii=False, indent=2)
+                removed = before - len(remaining)
+                print(f"🧹 已按ID删除 {removed} 条临时关注事件")
+                return removed
+            return 0
+        except Exception as e:
+            print(f"❌ 按ID删除临时关注事件失败: {e}")
+            return 0
 
     # === 🔖 活跃标签 ===
     def update_active_tags(self, new_tags: List[str]):
