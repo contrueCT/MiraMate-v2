@@ -11,6 +11,7 @@ services:
       - DOCKER_ENV=1
       - HOST=0.0.0.0
       - PORT=8000
+      - MIRAMATE_AUTH_TOKEN=MiraMateKey
       # 可选：覆盖配置目录（默认为 /app/configs）
       # - CONFIG_DIR=/app/configs
     ports:

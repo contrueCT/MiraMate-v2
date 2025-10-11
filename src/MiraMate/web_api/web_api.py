@@ -44,6 +44,7 @@ import logging
 from MiraMate.web_api.conversation_adapter import ConversationHandlerAdapter
 from MiraMate.web_api.config_manager import ConfigManager
 from MiraMate.web_api.websocket_handler import ws_manager, proactive_service, start_proactive_service
+from MiraMate.web_api import auth
 from MiraMate.web_api.models import (
     ChatRequest, ChatResponse, EmotionalState, 
     ChatHistory, ChatHistoryItem, HealthStatus, ErrorResponse,
@@ -173,6 +174,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# HTTP 鉴权中间件（仅当设置 MIRAMATE_AUTH_TOKEN 时启用；白名单仅 /api/health）
+@app.middleware("http")
+async def _auth_middleware(request: Request, call_next):
+    try:
+        auth.verify_http_request(request)
+    except HTTPException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"detail": e.detail},
+            headers=getattr(e, "headers", None),
+        )
+    return await call_next(request)
+
 # 注意：此应用使用Electron客户端，不直接提供web前端
 # mira-desktop/web 目录中的文件是给Electron客户端使用的
 print("💡 此应用使用Electron客户端，不提供直接的web前端访问")
@@ -184,6 +198,12 @@ print(f"🖥️  Electron客户端文件位于: {os.path.join(project_root, 'mir
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket连接端点"""
+    # 在建立连接前进行 WebSocket 鉴权（仅当设置 MIRAMATE_AUTH_TOKEN）
+    if auth.is_auth_enabled():
+        token = websocket.query_params.get("token")
+        if not auth.verify_token_value(token):
+            await websocket.close(code=1008, reason="Unauthorized")
+            return
     # 建立连接
     if not await ws_manager.connect(websocket):
         return

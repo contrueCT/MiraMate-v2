@@ -20,6 +20,7 @@
   - `DOCKER_ENV=1`（容器模式标识）
   - `HOST=0.0.0.0`（在容器内监听所有地址）
   - `PORT=8000`
+  - `MIRAMATE_AUTH_TOKEN`（可选，启用简单鉴权；默认示例使用 `MiraMateKey`）
 - 主要访问地址：
   - 健康检查: `http://localhost:8000/api/health`
   - OpenAPI 文档: `http://localhost:8000/docs`
@@ -82,7 +83,7 @@ docker compose logs -f
 docker compose down
 ```
 
-> 说明：`docker-compose.yml` 已包含端口映射（`8000:8000`）、环境变量（`DOCKER_ENV/HOST/PORT`）与卷挂载（`./configs:/app/configs`、`./memory:/app/memory`），开箱即用。
+> 说明：`docker-compose.yml` 已包含端口映射（`8000:8000`）、环境变量（`DOCKER_ENV/HOST/PORT/MIRAMATE_AUTH_TOKEN`）与卷挂载（`./configs:/app/configs`、`./memory:/app/memory`），开箱即用。
 
 ---
 
@@ -103,7 +104,7 @@ docker build -t miramate-api:latest .
 ```powershell
 docker run -d --name miramate-api `
   -p 8000:8000 `
-  -e DOCKER_ENV=1 -e HOST=0.0.0.0 -e PORT=8000 `
+  -e DOCKER_ENV=1 -e HOST=0.0.0.0 -e PORT=8000 -e MIRAMATE_AUTH_TOKEN=MiraMateKey `
   -v "${PWD}\configs:/app/configs" `
   -v "${PWD}\memory:/app/memory" `
   miramate-api:latest
@@ -114,7 +115,7 @@ docker run -d --name miramate-api `
 ```bash
 docker run -d --name miramate-api \
   -p 8000:8000 \
-  -e DOCKER_ENV=1 -e HOST=0.0.0.0 -e PORT=8000 \
+  -e DOCKER_ENV=1 -e HOST=0.0.0.0 -e PORT=8000 -e MIRAMATE_AUTH_TOKEN=MiraMateKey \
   -v "$(pwd)/configs:/app/configs" \
   -v "$(pwd)/memory:/app/memory" \
   miramate-api:latest
@@ -193,7 +194,7 @@ docker pull <YOUR_DOCKERHUB_USERNAME>/miramate-api:latest
 
 docker run -d --name miramate-api \
   -p 8000:8000 \
-  -e DOCKER_ENV=1 -e HOST=0.0.0.0 -e PORT=8000 \
+  -e DOCKER_ENV=1 -e HOST=0.0.0.0 -e PORT=8000 -e MIRAMATE_AUTH_TOKEN=MiraMateKey \
   -v "$(pwd)/configs:/app/configs" \
   -v "$(pwd)/memory:/app/memory" \
   <YOUR_DOCKERHUB_USERNAME>/miramate-api:latest
