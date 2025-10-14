@@ -35,6 +35,10 @@ def should_skip_auth(path: str) -> bool:
 
 def verify_http_request(request: Request) -> None:
     """校验 HTTP 请求的 Bearer Token，不通过则抛出 401。"""
+    # 放行 CORS 预检与无实体的探测请求
+    if request.method in ("OPTIONS", "HEAD"):
+        return
+
     if not is_auth_enabled():
         return
     if should_skip_auth(request.url.path):

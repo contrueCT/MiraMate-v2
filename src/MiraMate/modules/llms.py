@@ -7,25 +7,9 @@ from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from sympy import false
+from MiraMate.modules.settings import get_project_root as _settings_project_root
 
-MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-def get_project_root():
-    """基于项目结构自动推断项目根目录（包含 pyproject.toml 且有 src/MiraMate）。"""
-    current = MODULE_DIR
-    p = current
-    for _ in range(6):
-        candidate = p
-        if (os.path.exists(os.path.join(candidate, 'pyproject.toml')) and
-                os.path.exists(os.path.join(candidate, 'src', 'MiraMate'))):
-            return candidate
-        parent = os.path.dirname(candidate)
-        if parent == candidate:
-            break
-        p = parent
-    return os.path.abspath(os.path.join(MODULE_DIR, '..', '..', '..'))
-
-PROJECT_ROOT = get_project_root()
+PROJECT_ROOT = str(_settings_project_root())
 LLM_CONFIG_PATH = os.path.join(PROJECT_ROOT, "configs", "llm_config.json")
 
 def create_llm_from_config(config: Dict[str, Any], is_main_llm: bool = False, **kwargs) -> BaseChatModel:

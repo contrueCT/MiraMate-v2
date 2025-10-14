@@ -14,27 +14,11 @@ from MiraMate.modules.memory_system import memory_system, format_natural_time
 from MiraMate.modules.status_system import get_status_summary 
 from MiraMate.modules.TimeTokenMemory import CustomTokenMemory
 from MiraMate.modules.memory_cache import memory_cache
-from MiraMate.modules.settings import get_persona
+from MiraMate.modules.settings import get_persona, get_project_root as _settings_project_root
 
 
 
-# --- 1. System Prompt 构建函数 ---
-def get_project_root():
-    """基于项目结构自动推断项目根目录（包含 pyproject.toml 且有 src/MiraMate）。"""
-    current = os.path.abspath(__file__)
-    p = os.path.dirname(current)
-    for _ in range(6):
-        candidate = p
-        if (os.path.exists(os.path.join(candidate, 'pyproject.toml')) and
-                os.path.exists(os.path.join(candidate, 'src', 'MiraMate'))):
-            return candidate
-        parent = os.path.dirname(candidate)
-        if parent == candidate:
-            break
-        p = parent
-    return os.path.abspath(os.path.join(os.path.dirname(current), '..', '..', '..'))
-
-PROJECT_ROOT = get_project_root()
+PROJECT_ROOT = _settings_project_root()
 MIRA_MATE_ROOT = os.path.join(PROJECT_ROOT, 'src', 'MiraMate')
 PROMPTS_DIR = os.path.join(MIRA_MATE_ROOT, "prompts")
 env = Environment(loader=FileSystemLoader(PROMPTS_DIR))

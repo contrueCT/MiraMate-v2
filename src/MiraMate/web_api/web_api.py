@@ -33,6 +33,10 @@ def get_project_root():
 
 project_root = get_project_root()
 sys.path.insert(0, project_root)
+# 确保优先从源码导入（避免命中 site-packages 的已安装版本）
+src_path = os.path.join(project_root, "src")
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -165,15 +169,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# 配置CORS中间件
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 生产环境中应该限制为具体域名
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # HTTP 鉴权中间件（仅当设置 MIRAMATE_AUTH_TOKEN 时启用；白名单仅 /api/health）
 @app.middleware("http")
 async def _auth_middleware(request: Request, call_next):
@@ -192,6 +187,14 @@ async def _auth_middleware(request: Request, call_next):
 print("💡 此应用使用Electron客户端，不提供直接的web前端访问")
 print(f"🖥️  Electron客户端文件位于: {os.path.join(project_root, 'mira-desktop')}")
 
+# 配置CORS中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 生产环境中应该限制为具体域名
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ===== WebSocket端点 =====
 

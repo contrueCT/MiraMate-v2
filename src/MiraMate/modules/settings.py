@@ -1,8 +1,9 @@
 """
 集中配置读取模块
-- 统一从 configs/user_config.json 读取可变配置（persona/server/storage）
+- 统一从 configs/user_config.json 读取可变配置（persona/server）
 - 支持 mtime 检测以便热读，无需重启即可生效
 - 对 legacy 字段 environment 兼容（新写入使用 persona）
+- 注意：记忆目录现已固定为 <PROJECT_ROOT>/memory，不在配置文件中存储。
 """
 from __future__ import annotations
 
@@ -37,7 +38,7 @@ def _ensure_user_config_defaults(data: Dict[str, Any]) -> Dict[str, Any]:
     - persona: {user_name, agent_name, agent_description}
     - environment: 与 persona 同步以兼容旧逻辑（若一方缺失，用另一方填充）
     - server: {host, port}
-    - storage: {memory_dir}
+    - 注意：storage.memory_dir 已弃用，记忆目录固定为 <PROJECT_ROOT>/memory
     """
     os.makedirs(CONFIG_DIR, exist_ok=True)
 
@@ -51,7 +52,7 @@ def _ensure_user_config_defaults(data: Dict[str, Any]) -> Dict[str, Any]:
         "agent_description": "你是一个可爱的AI助手",
     }
     default_server = {"host": "0.0.0.0", "port": 8000}
-    default_storage = {"memory_dir": str(PROJECT_ROOT / "memory")}
+    # 存储目录不再从配置读取，固定为 <PROJECT_ROOT>/memory
 
     persona = data.get("persona")
     environment = data.get("environment")
@@ -100,15 +101,7 @@ def _ensure_user_config_defaults(data: Dict[str, Any]) -> Dict[str, Any]:
             server["port"] = default_server["port"]
             updated = True
 
-    # 3) storage 补齐
-    storage = data.get("storage")
-    if not isinstance(storage, dict):
-        data["storage"] = default_storage.copy()
-        updated = True
-    else:
-        if storage.get("memory_dir") is None:
-            storage["memory_dir"] = default_storage["memory_dir"]
-            updated = True
+    # 3) storage.memory_dir 已弃用，不再写入配置；若旧配置存在则忽略
 
     if updated:
         # 写回磁盘，便于用户直接编辑
@@ -184,9 +177,19 @@ def get_server() -> Dict[str, Any]:
 
 
 def get_storage() -> Dict[str, Any]:
-    """获取存储相关配置（目前仅 memory_dir，可选）。"""
-    data = _load_user_config()
-    storage = data.get("storage", {})
-    # 默认使用标准相对路径，容器内 WORKDIR=/app 时命中卷挂载
-    mem_dir = storage.get("memory_dir") or str(PROJECT_ROOT / "memory")
-    return {"MEMORY_DIR": mem_dir}
+    """[兼容保留] 获取存储相关配置。
+
+    注意：storage.memory_dir 已弃用，本函数始终返回固定的 MEMORY_DIR。
+    后续代码应改为调用 get_memory_dir()。
+    """
+    return {"MEMORY_DIR": str(PROJECT_ROOT / "memory")}
+
+
+def get_memory_dir() -> str:
+    """返回固定的记忆根目录：<PROJECT_ROOT>/memory。"""
+    return str(PROJECT_ROOT / "memory")
+
+
+def get_project_root() -> Path:
+    """公开的项目根目录获取函数，供全局统一引用。"""
+    return PROJECT_ROOT

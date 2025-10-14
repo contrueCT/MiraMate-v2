@@ -8,7 +8,6 @@ from pathlib import Path
 
 import shutil
 import importlib
-from MiraMate.modules.settings import get_server
 
 # Docker环境适配
 def get_project_root():
@@ -24,7 +23,15 @@ def get_project_root():
     return Path(__file__).parent.parent.parent.parent
 
 project_root = get_project_root()
-sys.path.insert(0, str(project_root))
+# 确保优先从源码导入（避免命中 site-packages 的已安装版本）
+src_path = project_root / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# 现在再导入 settings，确保命中源码版本
+from MiraMate.modules.settings import get_server
 
 def check_dependencies():
     """轻量依赖检查：通过导入探测所需模块，提供安装指引，不在运行时安装。"""
