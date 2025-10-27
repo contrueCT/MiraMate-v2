@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from collections import deque
 from typing import List, Dict, Any
 
@@ -19,8 +20,8 @@ class CustomTokenMemory(BaseChatMessageHistory):
     def __init__(self, 
                  llm_model_name: str = "gpt-4o",
                  max_token_limit: int = 100000, 
-                 retention_time: int = 1800, 
-                 continuity_threshold: int = 180, 
+                 retention_time: int = 3600, 
+                 continuity_threshold: int = 600, 
                  min_conversation_to_keep: int = 40):
         """
         标准的Python构造函数，直接初始化所有属性。
@@ -75,9 +76,10 @@ class CustomTokenMemory(BaseChatMessageHistory):
     # --- 内部辅助方法 ---
 
     def _add_message(self, message: BaseMessage, token_count: int) -> None:
+        ts = time.time()
         new_item = {
-            "message": f"{message.content} 【{format_natural_time(time.time())}】",
-            "timestamp": time.time(),
+            "message": f"{message.content} 【{format_natural_time(datetime.fromtimestamp(ts))}】",
+            "timestamp": ts,
             "token_count": token_count
         }
         self.memory.append(new_item)
@@ -85,11 +87,31 @@ class CustomTokenMemory(BaseChatMessageHistory):
         
     def _manage_memory(self) -> None:
         current_time = time.time()
+        current_dt = datetime.fromtimestamp(current_time)
         min_messages_to_keep = self.min_conversation_to_keep * 2
 
+        # 规则一：当总token超限时，按先进先出丢弃，保留至少min_messages_to_keep条
         while self.total_token_count > self.max_token_limit and len(self.memory) > min_messages_to_keep:
             removed = self.memory.popleft()
             self.total_token_count -= removed["token_count"]
+
+        # 规则二（新增）：跨日且超过8小时的历史消息，强制删除（即便低于最低保留数）
+        eight_hours = 8 * 3600
+        if self.memory:
+            survivors_forced = deque()
+            removed_tokens = 0
+            for item in self.memory:
+                ts = item["timestamp"]
+                item_dt = datetime.fromtimestamp(ts)
+                is_cross_day = (item_dt.date() != current_dt.date())
+                is_older_than_8h = (current_time - ts) > eight_hours
+                if is_cross_day and is_older_than_8h:
+                    removed_tokens += item["token_count"]
+                    continue  # 强制删除
+                survivors_forced.append(item)
+            if len(survivors_forced) != len(self.memory):
+                self.memory = survivors_forced
+                self.total_token_count -= removed_tokens
 
         if len(self.memory) <= min_messages_to_keep:
             return
