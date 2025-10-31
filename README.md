@@ -84,7 +84,9 @@
 ### 2. 克隆与安装
 
 ```bash
+# 克隆代码
 git clone https://github.com/contrueCT/MiraMate-v2.git
+# 激活虚拟环境并安装依赖
 cd MiraMate-v2
 python -m venv .venv
 ./.venv/Scripts/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
@@ -94,7 +96,13 @@ pip install -e .[dev]
 或使用 uv（推荐快速 + 可复现）：
 
 ```bash
+# 安装uv
+# Linux：
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows：
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+# 使用uv激活虚拟环境并安装依赖
 uv venv
 uv pip install -e .
 ```
