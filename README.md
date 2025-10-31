@@ -84,8 +84,8 @@
 ### 2. 克隆与安装
 
 ```bash
-git clone https://github.com/contrueCT/MiraMate.git
-cd MiraMate
+git clone https://github.com/contrueCT/MiraMate-v2.git
+cd MiraMate-v2
 python -m venv .venv
 ./.venv/Scripts/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -e .[dev]
